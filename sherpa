@@ -4,7 +4,7 @@
 ###### JONAH'S CODE #####
 library(httr)
 library(jsonlite)
-base_api_url <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&api-key=BBACA1DC-E7B8-11EA-9E90-C043122D6054&format=Json"
+base_api_url <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&api-key=BBACA1DC-E7B8-11EA-9E90-C043122D6054&format=Json&limit=100&offset="
 i <- 0
 number_of_times_to_run <- 2
 while (i < number_of_times_to_run) {
@@ -22,7 +22,7 @@ library(httr)
 library(jsonlite)
 
 # Store all pages in a list
-baseurl <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&api-key=BBACA1DC-E7B8-11EA-9E90-C043122D6054&format=Json&limit=100&offset="
+baseurl <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&api-key=BBACA1DC-E7B8-11EA-9E90-C043122D6054&format=Json"
 pages <- list()
 for (i in 0:20){
   mydata <- fromJSON(paste0(baseurl, "&page=", i))
