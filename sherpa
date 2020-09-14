@@ -1,0 +1,45 @@
+# Goal is to write an API request that loops enough times to get all the information we need
+# Guidance on writing such a loop here: https://rdrr.io/cran/jsonlite/f/vignettes/json-paging.Rmd
+
+###### JONAH'S CODE #####
+library(httr)
+library(jsonlite)
+base_api_url <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&api-key=BBACA1DC-E7B8-11EA-9E90-C043122D6054&format=Json&limit=100&offset="
+i <- 0
+number_of_times_to_run <- 2
+while (i < number_of_times_to_run) {
+  api_url <- paste(base_api_url, i*100, sep='')
+  print(api_url)
+  res = GET(api_url, user_agent("tom.kenny@ukri.org"))
+  data = rawToChar(res$content)
+  write(data, paste(i, ".json", sep=''))
+  i = i + 1;
+}
+
+##### MY ATTEMPT TO DO THE CODE #####
+# Load packages
+library(httr)
+library(jsonlite)
+
+# Store all pages in a list
+baseurl <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&api-key=BBACA1DC-E7B8-11EA-9E90-C043122D6054&format=Json&limit=100&offset="
+pages <- list()
+for (i in 0:20){
+  mydata <- fromJSON(paste0(baseurl, "&page=", i))
+  message("Retrieving page ", i)
+  pages[[i+1]] <- mydata$publications
+}
+
+# Combine all into one
+publications <- rbind_pages(pages)
+
+# Check output
+nrow(publications)
+
+
+##### MERGING JSON FILES TOGETHER #####
+
+
+##### JSON TO R/ CSV #####
+data2 <- fromJSON("C:/Users/TKen02/OneDrive - UKRI/Documents/0.json", flatten = FALSE)
+colnames(data2)
