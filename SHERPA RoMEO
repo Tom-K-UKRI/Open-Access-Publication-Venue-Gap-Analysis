@@ -1,19 +1,19 @@
 # This code uses the Sherpa API and Jsonlite to download open access data on journals and then filter it to pull out useful returns from the JSON and convert it into CSV.
-# Jsonlite documentation: https://cran.r-project.org/web/packages/jsonlite/jsonlite.pdf
 
 # Load packages
 library(httr)
-library(jsonlite)
+  # Jsonlite documentation: https://cran.r-project.org/web/packages/jsonlite/jsonlite.pdf
+    library(jsonlite)
 
 # Set number of times to query api here (if limit = 100 then this needs to be total number of journals / 100)
-max_api_calls <- 1
+max_api_calls <- 2
 
 # Add API key/ access token - this is Tom Kenny's token but easy to generate your own
 api_key <- "E46056F4-F72C-11EA-B80C-3822122D6054"
 
-# Creating the API url (might want to reduce limit if testing)
+# Creating the API url (used small limit for testing but can go up to 100)
 base_api_url <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&format=Json"
-limit <- 100
+limit <- 10
 api_url <- paste0(base_api_url, "&api-key=", api_key, "&limit=", limit, "&offset=")
 
 # Creating a loop/ paging requests to overcome API limits, and flattening the JSON (see https://rdrr.io/cran/jsonlite/f/vignettes/json-paging.Rmd)
@@ -21,8 +21,9 @@ pages <- list()
 for(i in 1:max_api_calls){
   offset <- limit*(i-1)
   page <- fromJSON(paste0(api_url, offset), flatten = TRUE)
+  page <- page$items
   message("Querying api for ", limit, " publications at offset ", offset)
-  pages[[i]] <- page%items
+  pages[[i]] <- page
 }
 
 # Combining queries into a single JSON file
@@ -32,47 +33,51 @@ publications <- rbind_pages(pages)
 # Filtering to get only the columns we want - the structure of the data is very complex so can't take it all
 message("Filtering publications")
 select_columns <- function(publication) {
- 
- # Simple filters
-  title <- publication["title"][[1]][["title"]][[1]]
+  
+  # Simple filters
+  title <- publication["title"][[1]]["title"][[1]][1]
   message("Filtered " , title)
   issn <- publication["issns"][[1]]["issn"][[1]][1]
   issn_e <- publication["issns"][[1]]["issn"][[1]][2]
   listed_in_doaj <- publication["listed_in_doaj_phrases"][[1]]["value"][[1]][1]
   
- # Figure out how to ignore submitted policies and look at accepted and published only
- 
- # Developilters involving publisher policies (i.e. involving decisions about which policy to use)
+  # Figure out how to ignore submitted policies and look at accepted and published only
   
-    # get shortest embargo if available
-    publisher_policies <- publication["publisher_policy"][[1]]
-    embargo <- NA
-    for(i in 1:NROW(publisher_policies)) {
-      # publisher_policies[i,]
-      if(exists("permitted_oa", publisher_policies[i,])) {
-        # policy - ignore submitted - accepted and published only
-        # print(typeof(publisher_policies[i,]["permitted_oa"]))
-        policy <- publisher_policies[i,]["permitted_oa"][1,][[1]]
-        if(exists("embargo.amount", policy )) {
-          smallest_embargo_amount <- 999999
-          for (j in 1:nrow(policy["embargo.amount"])) {
-            embargo_amount <- policy["embargo.amount"][j,]
-            if (!is.na(embargo_amount) && embargo_amount < smallest_embargo_amount ) {
-              smallest_embargo_amount <- embargo_amount
-              embargo <- paste(embargo_amount, policy["embargo.units"][j,])
-            }
+  # Develop filters involving publisher policies (i.e. involving decisions about which policy to use)
+  
+  # open access prohibited? NOT SURE IF THIS IS NEEDED - IF IT IS WILL NEED SOME ADDITIONAL CODE TO ASK FOR CORRECT RETURN
+  open_access_prohibited <- publication["publisher_policy"][[1]]["open_access_prohibited"][[1]][1]
+  
+  # copyright owner - NOT WORKING this is returning NULL and I'm not sure why. Some publications have multiple policies for this
+  copyright_owner <- publication["publisher_policy"][[1]]["permitted_oa"][[1]]["copyright_owner"][[1]]
+  
+  # get shortest embargo if available (NB THIS NEEDS TO BE UPDATED TO MAKE SURE IT IS SHORTEST REGARDLESS OF POLICY)
+  publisher_policies <- publication["publisher_policy"][[1]]
+  embargo <- NA
+  for(i in 1:NROW(publisher_policies)) {
+    # publisher_policies[i,]
+    if(exists("permitted_oa", publisher_policies[i,])) {
+      # policy - ignore submitted - accepted and published only
+      # print(typeof(publisher_policies[i,]["permitted_oa"]))
+      policy <- publisher_policies[i,]["permitted_oa"][1,][[1]]
+      if(exists("embargo.amount", policy )) {
+        smallest_embargo_amount <- 999999
+        for (j in 1:nrow(policy["embargo.amount"])) {
+          embargo_amount <- policy["embargo.amount"][j,]
+          if (!is.na(embargo_amount) && embargo_amount < smallest_embargo_amount ) {
+            smallest_embargo_amount <- embargo_amount
+            embargo <- paste(embargo_amount, policy["embargo.units"][j,])
           }
         }
       }
     }
-
-    # license - create filter to pull out most permissible license - CC-BY > CC-BY-NC > CC-BY-SA > non-commercial (or just cc vs non commercial if necessary)
-    
-    # embargo - update to make sure it is shortest regardless of the policy
-    
-    # conditions - from policy with most permissible license
-
- return(list(title = title, issn = issn, issn_e = issn_e, embargo = embargo, listed_in_doaj = listed_in_doaj, open_access_prohibited = open_access_prohibited, copyright_owner = copyright_owner))
+  }
+  
+  # license - create filter to pull out most permissible license - CC-BY > CC-BY-NC > CC-BY-SA > non-commercial (or just cc vs non commercial if necessary)
+  
+  # conditions - from policy with most permissible license
+  
+  return(list(title = title, issn = issn, issn_e = issn_e, embargo = embargo, listed_in_doaj = listed_in_doaj, open_access_prohibited = open_access_prohibited, copyright_owner = copyright_owner))
 }
 
 filtered_publications <- apply(X = publications, MARGIN = 1, FUN = select_columns)
@@ -85,6 +90,6 @@ filtered_publications <- data.frame(t(sapply(filtered_publications,c)))
 filtered_publications <- as.matrix(filtered_publications)
 
 message("Writing to csv")
-write.csv2(x = filtered_publications, file = "output.csv")
+write.csv(x = filtered_publications, file = "output.csv")
 
 message("Done")
