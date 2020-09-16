@@ -1,0 +1,15 @@
+# This will merge all our data together into one master dataset at an article level. It worked fine for Sherpa and Dimensions data but will need to develop to bring in ESAC etc.
+
+# Load libraries
+library(dplyr)
+library(readr)
+
+# Read CSVs
+sherpa <- read_csv("Sherpa_data.csv")
+dimensions <- read_csv("Dimensions_data.csv")
+
+# Use left_join to merge them (keeping all dimensions/ article rows and brining in journal and publisher level data)
+sherpa_dimensions_left <- left_join(dimensions, sherpa, by = c("issn" = "issn"))
+
+# Write it into a csv file
+write.csv(x = sherpa_dimensions_left, file = "sherpa_dimensions_left.csv")
