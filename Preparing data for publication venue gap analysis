@@ -51,14 +51,27 @@ dimensions <- read_csv("Dimensions data.csv")
 
 ###########
 # 2. DOWNLOADING AND PREPARING ESAC DATA
-  # NB. ESAC data can be downloaded from https://esac-initiative.org/about/transformative-agreements/agreement-registry/. 
 
   # Download ESAC data
-  
-  # Select only JISC-negotiated deals
-  
-  # Rename 'publisher' names to match Dimensions data
+esac_url <- "https://esac-initiative.org/about/transformative-agreements/agreement-registry/"
+esac <- xml2::read_html(esac_url)
+esac <- rvest::html_table(esac)[[1]] %>%
+  tibble::as_tibble(.name_repair = "unique")
 
+  # Select only JISC-negotiated deals
+esac <- dplyr::filter(esac, Organization == "Jisc")
+
+  # Rename 'publisher' names to match Dimensions data
+esac[ ,1]
+esac[1, 1] <- "Association for Computing Machinery (ACM)"
+esac[2, 1] <- "The Company of Biologists"
+esac[3, 1] <- "European Respiratory Society (ERS)"
+esac[7, 1] <- "Karger Publishers"
+esac[11, 1] <- "SAGE Publications"
+esac[13, 1] <- "Geological Society of London"
+
+  # Create new column has_ta = yes
+esac$has_ta <- "yes"
 
 
 ###########
@@ -108,12 +121,8 @@ sherpa <- sherpa[!duplicated(sherpa$j_title, incomparables = NA), ]
   
 ###########
 # 4. LEFT-JOINING ESAC INTO DIMENSIONS MATCHING ON 'PUBLISHER'
-  # NB The csv below was downloaded to and formatted in Excel as I didn't do the R code for it yet.
 
-esac <- read_csv("ESAC 23.09.20 (for merging with Dimensions).csv")
-
-merged_pvga <- left_join(dimensions, esac, by = c("publisher" = "publisher"))
-
+merged_pvga <- left_join(dimensions, esac[ , c("Publisher", "has_ta")], by = c("publisher" = "Publisher"))
 
 
 ###########
