@@ -1,0 +1,136 @@
+# SHERPA ROMEO CODE FOR VENUE GAP ANALYSIS
+
+#1. DOWNLOAD FROM API
+
+# Load packages
+library(httr)
+library(jsonlite)
+library(tidyverse)
+
+# Set number of times to query api here (limit = 100, total of 30,969 records as of 25/09/20 so need 310 API calls to download all data)
+max_api_calls <- ___
+
+# Add API key/ access token - you can get a key instantly and for free by registering https://v2.sherpa.ac.uk/cgi/register
+api_key <- "INSERT-API-KEY"
+
+# Creating the API url (it uses 'limit' and 'offset' for paging e.g. 1st page is offset 0, limit 100, 2nd is offset 100, limit 100.
+base_api_url <- "https://v2.sherpa.ac.uk/cgi/retrieve?item-type=publication&format=Json"
+limit <- 100
+api_url <- paste0(base_api_url, "&api-key=", api_key, "&limit=", limit, "&offset=")
+
+  # Creating a loop/ paging requests, and flattening the JSON
+pages <- list()
+for(i in 1:max_api_calls){
+  offset <- limit*(i-1)
+  page <- fromJSON(paste0(api_url, offset), flatten = TRUE)
+  page <- page$items
+  message("Querying api for ", limit, " publications at offset ", offset)
+  pages[[i]] <- page
+}
+
+# Combining queries into a single JSON file
+message("Combining queries")
+publications <- rbind_pages(pages)
+save(publications, file = "sherpa_publications")
+
+# ====================
+
+# 2. FILTERING JSON TO RETURN RELEVANT VARIABLES IN ACCESSIBLE FORM
+
+# we first need to run through journals one at a time so set up page as one record
+page <- publications[1,]
+
+# initialise first record, selecting all relevant variables
+title <- unnest(page, 'title') %>% select(title) %>% head(1)
+issn <- as.data.frame(page$issns) %>% select(type, issn) %>% pivot_wider(names_prefix='issn_', names_from = type, values_from = issn)
+doaj <- select(page, 'listed_in_doaj')
+sherpa_id <- select(page, 'id')
+sherpa_web <- select(page, 'system_metadata.uri')
+
+oa_prohibited <- as.data.frame(page$publisher_policy) %>% select(open_access_prohibited) %>% mutate(pubpol_id = seq_len(n()), title=title$title)
+
+publisher <- unnest(as.data.frame(page$publishers), 'publisher.name') %>% select(name)
+
+  # Lots of the open access data is nested within 'publisher_policy - this code unnests this to pull out key elements.
+
+if ('permitted_oa' %in% names(as.data.frame(page$publisher_policy))){
+  pubpol_list <- list()
+  for (k in 1:nrow(oa_prohibited)){
+    
+    pubpol_temp <- unnest(as.data.frame(page$publisher_policy)[k, ], 'permitted_oa') %>%
+      select(any_of(c('rowname', 'additional_oa_fee', 'article_version', 'additional_oa_fee', 'embargo.amount', 'embargo.units', 'license', 'copyright_owner', 'conditions', 'location.location'))) %>%
+      mutate(pubpol_id = k)
+    
+    pubpol_list[[k]] <- pubpol_temp
+    
+  }
+  
+  pubpol <- do.call(bind_rows, pubpol_list)
+  
+  pubpol_oa <- merge(oa_prohibited, pubpol, by='pubpol_id')
+  
+} else {
+    pubpol_oa <- oa_prohibited 
+}
+
+record <- merge(cbind(sherpa_id, title, issn, doaj, publisher, sherpa_web), pubpol_oa, by='title')
+records <- record
+
+# Run loop -----------------------------------
+  # NB - three errors remain relating to NULL values in issn and open_access_prohibited, and four instances of ISSN where there are multiple options for issn and e-issn. At the moment around 75 journals are simply excluded/ slipped.
+
+exclude <- c(1404, 9364, 30047, 30487)
+
+for(i in (1:30969)[-exclude]){
+  
+  page <- publications[i,]
+  
+  title <- unnest(page, 'title') %>% select(title) %>% head(1)
+  
+  issn <- as.data.frame(page$issns)
+  if(is.null(issn$type)) {next} 
+  issn <- as.data.frame(page$issns) %>% select(type, issn) %>% pivot_wider(names_prefix='issn_', names_from = type, values_from = issn)
+  
+  doaj <- select(page, 'listed_in_doaj')
+  
+  sherpa_id <- select(page, 'id')
+  
+  sherpa_web <- select(page, 'system_metadata.uri')
+  
+  oa_prohibited <- as.data.frame(page$publisher_policy)
+  if(is.null(oa_prohibited$open_access_prohibited)) {next}
+  oa_prohibited <- as.data.frame(page$publisher_policy) %>% select(open_access_prohibited) %>% mutate(pubpol_id = seq_len(n()), title=title$title)
+  
+  publisher <- unnest(as.data.frame(page$publishers), 'publisher.name') %>% select(name)
+  
+  if ('permitted_oa' %in% names(as.data.frame(page$publisher_policy))){
+    pubpol_list <- list()
+    for (k in 1:nrow(oa_prohibited)){
+      
+      pubpol_temp <- unnest(as.data.frame(page$publisher_policy)[k, ], 'permitted_oa') %>%
+        select(any_of(c('rowname', 'additional_oa_fee', 'article_version', 'additional_oa_fee', 'embargo.amount', 'embargo.units', 'license', 'copyright_owner', 'conditions', 'location.location'))) %>%
+        mutate(pubpol_id = k)
+      
+      pubpol_list[[k]] <- pubpol_temp
+      
+    }
+    
+    pubpol <- do.call(bind_rows, pubpol_list)
+    
+    pubpol_oa <- merge(oa_prohibited, pubpol, by='pubpol_id')
+    
+  } else {
+    pubpol_oa <- oa_prohibited 
+    
+  }
+  
+  record <- merge(cbind(sherpa_id, title, issn, doaj, publisher, sherpa_web), pubpol_oa, by='title')
+  records <- bind_rows(records, record)
+  
+  message(i)
+  
+}
+
+# ----
+# write to excel
+openxlsx::write.xlsx(as.data.frame(records), 'sherpa_all_policies.xlsx')
