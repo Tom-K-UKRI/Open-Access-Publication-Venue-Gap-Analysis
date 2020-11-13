@@ -257,7 +257,55 @@ journal_type_a_ref_bar <- journal_type_a_ref %>%
   labs(x="REF Panels", y= "% of all articles in panel")
 ggsave(journal_type_a_ref_bar, filename = "journal_type_a_ref_bar.png")
 
+
 ##########
+
+# POTENTIAL COMPLIANCE WITH CURRENT POLICY
+
+# 1. # Full break down of potential compliance with old policy
+compliance_old_a <- merged_pvga %>%
+  filter(!(is.na(sherpa_id) & has_ta == "no")) %>%
+  count(compliance_old, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0)) %>%
+  adorn_totals("row")
+compliance_old_a
+
+compliance_old_j <- merged_pvga %>%
+  filter(!duplicated(journal_title)) %>%
+  filter(!(is.na(sherpa_id) & has_ta == "no")) %>%
+  count(compliance_old, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0)) %>%
+  adorn_totals("row")
+compliance_old_j
+
+compliance_old <- bind_cols(compliance_old_a, compliance_old_j) %>%
+  select(-5)
+rm(compliance_old_a, compliance_old_j)
+openxlsx::write.xlsx(as.data.frame(compliance_old), 'compliance_old.xlsx')
+
+# 2. Potential compliance with current policy by ref_panel
+
+  # There are two ref columns and we need to know if each subject exists in either of them for each article.
+ref_panels <- merged_pvga %>% pivot_longer(c(ref_panel, ref_panel2), names_to = "ref_all", values_to ="ref")
+
+compliance_ref2 <- ref_panels %>%
+  filter(!(is.na(sherpa_id) & has_ta == "no")) %>%
+  filter(ref != "Missing" & ref != "") %>% 
+  group_by(ref) %>%
+  count(compliance_old2, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n)) * 100) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent, 0))
+compliance_ref2
+openxlsx::write.xlsx(as.data.frame(compliance_ref2), 'compliance_ref2.xlsx')
+
+
+###########
+
 # HYPOTHETICAL OPEN ACCESS UNDER NEW UKRI POLICY
 
 
