@@ -507,6 +507,41 @@ merged_pvga$g_license3[merged_pvga$g_license2 != "no compliant license"] <- TRUE
 merged_pvga$g_license3[merged_pvga$g_license2 == "no compliant license"] <- FALSE
 merged_pvga$g_license3[is.na(merged_pvga$g_license2)] <- NA
 
+# Create new variable for compliance with old policy - criteria for compliance is 
+merged_pvga$compliance_old <- NA
+merged_pvga$compliance_old[merged_pvga$journal_type == "Pure gold" & 
+                             (is.na(merged_pvga$fee_license2) | merged_pvga$fee_license2 == "cc_by")] <- "c: pure gold"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & merged_pvga$open_access_categories == "Hybrid" & 
+                             (is.na(merged_pvga$fee_license2) | merged_pvga$fee_license2 == "cc_by")] <- "c: hybrid gold"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & 
+                             merged_pvga$journal_type != "Pure gold" & 
+                             (merged_pvga$g_embargo <= 6 | (merged_pvga$ref_panel == "D" & merged_pvga$g_embargo <= 12)) & 
+                             merged_pvga$g_article_version != "submitted" & 
+                             (merged_pvga$g_license1 == "cc_by" | merged_pvga$g_license1 == "no license requirement" | merged_pvga$g_license1 == "cc_by_nc")] <- "c: green oa"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & merged_pvga$has_ta == "yes"] <- "c: only by ta"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & 
+                             (merged_pvga$journal_type == "Pure gold" | merged_pvga$open_access_categories == "Hybrid") & 
+                             (merged_pvga$fee_license2 != "cc_by" | (merged_pvga$g_article_version == "published" & merged_pvga$g_license2 != "cc_by"))] <- "nc: gold oa but non-compliant license"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & 
+                             (merged_pvga$g_embargo > 12 | (merged_pvga$ref_panel != "D" & merged_pvga$g_embargo > 6)) | 
+                                    (merged_pvga$ref_panel == "Missing" & merged_pvga$g_embargo >6) & 
+                             (merged_pvga$g_license1 == "cc_by" | merged_pvga$g_license1 == "cc_by_nc")] <- "nc: compliant green license but has long embargo"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & 
+                             (merged_pvga$g_embargo <= 6 | (merged_pvga$ref_panel == "D" & merged_pvga$g_embargo <= 12)) & 
+                             (merged_pvga$g_license1 != "cc_by" & merged_pvga$g_license1 != "cc_by_nc")] <- "nc: compliant embargo but no compliant license"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & 
+                             (merged_pvga$g_embargo > 12 | (merged_pvga$ref_panel != "D" & merged_pvga$g_embargo > 6)) | (merged_pvga$ref_panel == "Missing" & merged_pvga$g_embargo >6) & 
+                             (merged_pvga$g_license1 != "cc_by" & merged_pvga$g_license1 != "cc_by_nc")] <- "nc: long embargo and no compliant license"
+merged_pvga$compliance_old[is.na(merged_pvga$compliance_old) & is.na(merged_pvga$g_license2)] <- "nc: not gold and no green policy identified"
+
+# Simplify compliance_old to compliance_old2 by merging non-compliant categories.
+merged_pvga$compliance_old2 <- merged_pvga$compliance_old
+merged_pvga$compliance_old2[merged_pvga$compliance_old2 != "c: pure gold" & merged_pvga$compliance_old2 !=  "c: hybrid gold" & merged_pvga$compliance_old2 !=  "c: green oa" & merged_pvga$compliance_old2 !=  "c: only by ta"] <- "no potential route to compliance"
+
+# Recode compliance_old vars as factors
+merged_pvga$compliance_old <- factor(merged_pvga$compliance_old, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa", "c: only by ta",  "nc: gold oa but non-compliant license", "nc: compliant green license but has long embargo", "nc: compliant embargo but no compliant license", "nc: long embargo and no compliant license", "nc: not gold and no green policy identified"))
+merged_pvga$compliance_old2 <- factor(merged_pvga$compliance_old2, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa", "c: only by ta",  "no potential route to compliance"))
+
 # Recode open_access_categories as factor
 merged_pvga$open_access_categories <- factor(merged_pvga$open_access_categories, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Green, published", "Green, accepted", "Bronze", "Green, submitted", "Closed"))
 merged_pvga$open_access_categories2 <- factor(merged_pvga$open_access_categories2, ordered = TRUE, levels = c("Pure gold", "Hybrid gold", "Green", "Closed"))
