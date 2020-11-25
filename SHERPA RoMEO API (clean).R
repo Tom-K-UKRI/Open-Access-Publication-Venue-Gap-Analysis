@@ -3,10 +3,11 @@
 # Author: Tom Kenny
 # Created: August 2020
 # Last Updated: November 2020
+# Last ran: 24.11.202
 
 # Purpose of code: to download information on journals' open access policies from the SHERPA API
 
-#################
+#XXXXXXXXXXXXXXXXX
 # Clear work space
 rm(list=ls())
 
@@ -14,8 +15,8 @@ rm(list=ls())
 mainDir <- "C:/Users/TKen02/UKRI/Policy Analysis - Documents/Open Access/Projects/Publication Venue Gap Analysis/Data/Original data"
 setwd(mainDir)
 
-#################
-#1. DOWNLOAD FROM API
+#XXXXXXXXXXXXXXXX
+#1. DOWNLOAD FROM API----
 
 # Load packages
 library(httr)
@@ -23,7 +24,7 @@ library(jsonlite)
 library(tidyverse)
 
 # Set number of times to query api here (limit = 100, total of 30,969 records as of 25/09/20 so need 310 API calls to download all data - the reasons it is not literally the highest id number/ 100 is because there are quite a lot of id numbers with no journal, where presumably the journal has been deleted)
-max_api_calls <- 310 # if Sherpa add more records this may need to be increased
+max_api_calls <- 310 # if Sherpa add more records this may need to be increased (this gets you up to ID = 37990)
 
 # Add API key/ access token - this is Tom Kenny's token but easy to generate your own
 api_key <- "E46056F4-F72C-11EA-B80C-3822122D6054"
@@ -48,14 +49,15 @@ message("Combining queries")
 publications <- rbind_pages(pages)
 save(publications, file = "sherpa_publications")
 
-# ====================
+#XXXXXXXXXXXXXXXXXXX
 
-# 2. FILTERING JSON TO RETURN RELEVANT VARIABLES IN ACCESSIBLE FORM - the original json data is very nested so needs work before it is useful - the goal here is to return one observation per journal policy
+# 2. FILTERING JSON TO RETURN RELEVANT VARIABLES IN ACCESSIBLE FORM----
+  #the original json data is very nested so needs work before it is useful - the goal here is to return one observation per journal policy
 
 # we need to run through journals one at a time so first set up page as one record
 page <- publications[1,] # i.e. page becomes the first journal rather than the first 100
 
-# initialise first record, selecting all relevant variables
+#a. initialise first record, selecting all relevant variables----
 title <- unnest(page, 'title') %>% select(title) %>% head(1)
 issn <- as.data.frame(page$issns) %>% mutate(row = row_number()) %>% select(type, issn, row) %>% pivot_wider(names_prefix='issn_', names_from = type, values_from = issn) %>% slice(1:2) %>% select(-row) %>% summarise_all(funs(first(na.omit(.)))) # this is needed because a few iterations of issn have duplicates
 doaj <- select(page, 'listed_in_doaj')
@@ -89,12 +91,10 @@ if ('permitted_oa' %in% names(as.data.frame(page$publisher_policy))){
 record <- merge(cbind(sherpa_id, title, issn, doaj, publisher, sherpa_web), pubpol_oa, by='title')
 records <- record
 
-# Run loop-----------------------------------
-  # NB - three errors remain, relating to NULL values in issn and open_access_prohibited, and three instances of ISSN where there are multiple options for issn and eissn. At the moment around 75 journals are simply excluded/ slipped, however this does not have a major impact on coverage. If this issue is not fixed it is likely the exclude list will need to be updated if the code is run again.
+#b. Run loop to repeat for all policies-----------------------------------
+  # NB - some journals are skipped because their data is formatted in a way which does not allow the loop to run (see code with next for issn and publisher policy). However, this is a relative small number of cases.
 
-exclude <- c(1399, 9342, 30886, 30887, 30888)
-
-for(i in (1:30985)[-exclude]){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
+for(i in (1:30100)){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
   
   page <- publications[i,]
   
@@ -145,8 +145,31 @@ for(i in (1:30985)[-exclude]){ # The number of records may need to change if thi
   
 }
 
+# EDITING EMBARGO VARIABLE----
+  # This code begins cleaning the sherpa data - it is only in this script because it takes a while to run so it slows down the other script
 
-############
-# ----
-# write to excel
-openxlsx::write.xlsx(as.data.frame(records), 'sherpa_all_policies.xlsx')
+
+# create new column sherpa$embargo which recodes embargo.amount to months where embargo.unit != 'months'
+# NB JISC told us that no data for embargo means no embargo
+# Alternative would be to create a new column using mutate, case_when (this is to do it all in one go and avoid for loop). E.g. #sherpa %>% mutate(embargo = ifelse(embargo.units = "month", TRUE = , FALSE = ,))
+
+sherpa <- records
+
+sherpa$embargo <- NA
+sherpa$embargo.amount[is.na(sherpa$embargo.amount)] <- 0
+sherpa$embargo.amount[sherpa$embargo.amount == ""] <- 0
+sherpa$embargo.units[is.na(sherpa$embargo.units)] <- "No embargo requirement" # Created this option to differentiate between no data and defined zero embargo though we were told by JISC that they are the same thing
+sherpa$embargo.units[sherpa$embargo.units == ""] <- "No embargo requirement"
+
+for (i in 1:nrow(sherpa)) {
+  if ((sherpa[i, 'embargo.amount'] == "No embargo requirement") | (sherpa[i, 'embargo.amount'] == 0)) {sherpa[i, 'embargo'] <- 0}
+  else if (sherpa[i, 'embargo.units'] == "months") {sherpa[i, 'embargo'] <- sherpa[i, 'embargo.amount']}
+  else if (sherpa[i, 'embargo.units'] == "days") {sherpa[i, 'embargo'] <- round((sherpa[i, 'embargo.amount'])/30)} 
+  else if (sherpa[i, 'embargo.units'] == "weeks") {sherpa[i, 'embargo'] <- ((sherpa[i, 'embargo.amount'])/4)}
+  else if (sherpa[i, 'embargo.units'] == "years") {sherpa[i, 'embargo'] <- sherpa[i, 'embargo.amount']*12}
+  else next
+} # This loop converts all embargo length into the same unit (months)
+
+#XXXXXXXXXXXXX
+# WRITE TO EXCEL----
+openxlsx::write.xlsx(as.data.frame(sherpa), 'sherpa_all_policies.xlsx')
