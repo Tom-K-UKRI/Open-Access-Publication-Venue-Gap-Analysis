@@ -479,7 +479,7 @@ merged_pvga$compliance_current2[merged_pvga$compliance_current2 != "not complian
 merged_pvga$compliance_new_hybrid <- NA
 merged_pvga$compliance_new_hybrid[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_hybrid[merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold"
-merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,4) & merged_pvga$num_new_green %in% c(1, 3)] <- "c: green oa"
+merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_new_green %in% c(1, 3)] <- "c: green oa"
 merged_pvga$compliance_new_hybrid[is.na(merged_pvga$compliance_new_hybrid)] <- "not compliant"
 
     # simplified binary version of compliance_new_hybrid
@@ -496,7 +496,7 @@ merged_pvga$compliance_new_hybrid2[merged_pvga$compliance_new_hybrid3 != "not co
 merged_pvga$compliance_new <- NA
 merged_pvga$compliance_new[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new[merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
-merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1, 3)] <- "c: green oa"
+merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,2,4,5) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1, 3)] <- "c: green oa"
 merged_pvga$compliance_new[is.na(merged_pvga$compliance_new)] <- "not compliant"
 
     # simplified binary version of compliance_new
