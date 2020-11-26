@@ -143,9 +143,14 @@ esac$Publisher <- gsub("Karger", "Karger Publishers", esac$Publisher)
 esac$Publisher <- gsub("Sage", "SAGE Publications", esac$Publisher)
 esac$Publisher <- gsub("The Geological Society of London", "Geological Society of London", esac$Publisher)
 esac$Publisher <- gsub("Cold Spring Harbor Laboratory Press", "Cold Spring Harbor Laboratory", esac$Publisher)
+esac$Publisher <- gsub("Walter de Gruyter", "De Gruyter", esac$Publisher)
+
 
   # Create new column has_ta = yes. This means that when it is merged into the dimensions data it will highlight all the articles with a publisher with ta.
 esac$has_ta <- "yes"
+
+  # Remove duplicates (Karger has two agreements which might create duplicates in the merge)
+esac <- esac[!duplicated(esac$Publisher, incomparables = NA), ]
 
 #XXXXXXXXXXXX
 # 3. PREPARING SHERPA ROMEO DATA----
@@ -407,7 +412,7 @@ merged_pvga <- left_join(merged_pvga, articles_per_journal, by = "journal_title"
 merged_pvga <- merged_pvga %>% filter(!is.na(sherpa_id))
 
 # Remove unnecessary variables (these were mostly metadata not used for analysis or only needed for testing)
-merged_pvga <- subset(merged_pvga, select = -c(date, issn1, issn2, issn3, issn4, category_uoa, funders, linkout, issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner, g_conditions, g_location.location, g_embargo.amount, g_embargo.units, fee_license, fee_copyright_owner, fee_conditions, pure_gold, is_hybrid, is_closed))
+merged_pvga <- subset(merged_pvga, select = -c(date, issn1, issn2, issn3, issn4, category_uoa, funders, linkout, issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner, g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions, pure_gold, is_hybrid, is_closed))
 
 #XXXXXXXXXXXXX
 #7. CREATE COMPLIANCE VARIABLES TO INDICATE COMPLIANCE WITH DIFFERENT POLICY SCENARIOS
@@ -479,7 +484,7 @@ merged_pvga$compliance_current2[merged_pvga$compliance_current2 != "not complian
 merged_pvga$compliance_new_hybrid <- NA
 merged_pvga$compliance_new_hybrid[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_hybrid[merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold"
-merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_new_green %in% c(1, 3)] <- "c: green oa"
+merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_new_green == 1] <- "c: green oa"
 merged_pvga$compliance_new_hybrid[is.na(merged_pvga$compliance_new_hybrid)] <- "not compliant"
 
     # simplified binary version of compliance_new_hybrid
@@ -496,7 +501,7 @@ merged_pvga$compliance_new_hybrid2[merged_pvga$compliance_new_hybrid3 != "not co
 merged_pvga$compliance_new <- NA
 merged_pvga$compliance_new[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new[merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
-merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,2,4,5) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1, 3)] <- "c: green oa"
+merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green == 1] <- "c: green oa"
 merged_pvga$compliance_new[is.na(merged_pvga$compliance_new)] <- "not compliant"
 
     # simplified binary version of compliance_new
@@ -511,6 +516,14 @@ merged_pvga$compliance_new2[merged_pvga$compliance_new2 != "not compliant"] <- "
 merged_pvga$open_access_categories <- factor(merged_pvga$open_access_categories, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Green, published", "Green, accepted", "Bronze", "Green, submitted", "Closed"))
 merged_pvga$open_access_categories2 <- factor(merged_pvga$open_access_categories2, ordered = TRUE, levels = c("Pure gold", "Hybrid gold", "Green", "Closed"))
 
+# Recode g_embargo3 as a factor
+merged_pvga$g_embargo <- factor(merged_pvga$g_embargo, ordered = TRUE, levels = c(0,3,6,12,18,24,36,48,NA))
+merged_pvga$g_embargo2 <- factor(merged_pvga$g_embargo2, ordered = TRUE, levels = c(0,6,12,13))
+merged_pvga$g_embargo3 <- factor(merged_pvga$g_embargo3, ordered = TRUE, levels = c("zero embargo", "has embargo"))
+
+# Recode g_compliant_repository as a factor
+merged_pvga$g_compliant_repository <- factor(merged_pvga$g_compliant_repository, ordered = TRUE, levels = c(TRUE, FALSE))
+
 # Turn license vars into factor to order by permissiveness (just to make outputs clearer)
 merged_pvga$g_license1 <- factor(merged_pvga$g_license1, ordered = TRUE, c("no license requirement", "cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke license", NA))
 merged_pvga$g_license2 <- factor(merged_pvga$g_license2, ordered = TRUE, c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license", NA))
@@ -520,7 +533,7 @@ merged_pvga$compliance_current <- factor(merged_pvga$compliance_current, ordered
 
 merged_pvga$compliance_new_hybrid <- factor(merged_pvga$compliance_new_hybrid, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa",  "not compliant"))
 
-merged_pvga$compliance_new <- factor(merged_pvga$compliance_new, ordered = TRUE, levels = c("c: pure gold", "hybrid gold with a TA", "c: green oa", "not compliant"))
+merged_pvga$compliance_new <- factor(merged_pvga$compliance_new, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: green oa", "not compliant"))
 
 # Recode journal_type as factor
 merged_pvga$journal_type <- factor(merged_pvga$journal_type, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Closed or insufficient information"))
@@ -536,5 +549,4 @@ merged_pvga <- merged_pvga[rows, ]
 
 openxlsx::write.xlsx(as.data.frame(merged_pvga), 'merged_pvga.xlsx')
 
-# 2017-20: We have a Sherpa link for 98.4% of the publications in the Dimensions sample. We have green (no fee) routes for almost all of these and paid (fee) routes for about three-fifths. This leaves us with 2368 articles in Dimensions not covered by Sherpa data (made up of 844 journals)
-# 2018 only: We have a Sherpa link for 98.1% of the publications in the Dimensions sample. We have green (no fee) routes for almost all of these and paid (fee) routes for about three-fifths. This leaves us with 784 articles in Dimensions not covered by Sherpa data (made up of 394 journals). From a check of these journals I don't think it is a matching issue - these are likely gaps in Sherpa's coverage.
+# Merged PVGA: We have a Sherpa link for 98.4% of the publications in the Dimensions sample. We have green (no fee) routes for almost all of these and paid (fee) routes for about three-fifths. This leaves us with 2368 articles in Dimensions not covered by Sherpa data (made up of 844 journals). merged_pvga excludes all articles without a sherpa link, leaving 145,925 articles in 8896 journals
