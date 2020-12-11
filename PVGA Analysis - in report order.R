@@ -14,10 +14,6 @@
 # Clear work space
 rm(list=ls())
 
-# Set working directory
-mainDir <- "C:\\Users\\TKen02\\UKRI\\Policy Analysis - Documents\\Open Access\\Projects\\Publication Venue Gap Analysis\\Analysis" # assuming an updated version of the merged_pvga data is saved here
-setwd(mainDir)
-
 #library(readr)
 library(tidyverse)
 library(openxlsx)
@@ -26,38 +22,10 @@ library(knitr)
 library(ggplot2)
 library(psych)
 
-
 #XXXXXXXXX
 # Import data
-merged_pvga <- read.xlsx("merged_pvga.xlsx")
+load("Data/merged_pvga.Rda")
 
-#####e. Final edits to merged_pvga (including creating factors)----
-  # NB THIS IS ALSO IN THE OTHER SCRIPT BUT FOR SOME REASON THE CREATION OF FACTORS DOESN'T SURVIVE THE JOURNEY TO EXCEL AND BACK SO IT NEEDS TO BE RUN AGAIN
-# Recode open_access_categories as factor
-merged_pvga$open_access_categories <- factor(merged_pvga$open_access_categories, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Green, published", "Green, accepted", "Bronze", "Green, submitted", "Closed"))
-merged_pvga$open_access_categories2 <- factor(merged_pvga$open_access_categories2, ordered = TRUE, levels = c("Pure gold", "Hybrid gold", "Green", "Closed"))
-
-# Recode g_embargo3 as a factor
-merged_pvga$g_embargo <- factor(merged_pvga$g_embargo, ordered = TRUE, levels = c(0,3,6,12,18,24,36,48,NA))
-merged_pvga$g_embargo2 <- factor(merged_pvga$g_embargo2, ordered = TRUE, levels = c(0,6,12,13))
-merged_pvga$g_embargo3 <- factor(merged_pvga$g_embargo3, ordered = TRUE, levels = c("zero embargo", "has embargo"))
-
-# Recode g_compliant_repository as a factor
-merged_pvga$g_compliant_repository <- factor(merged_pvga$g_compliant_repository, ordered = TRUE, levels = c(TRUE, FALSE))
-
-# Turn license vars into factor to order by permissiveness (just to make outputs clearer)
-merged_pvga$g_license1 <- factor(merged_pvga$g_license1, ordered = TRUE, c("no license requirement", "cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke license", NA))
-merged_pvga$g_license2 <- factor(merged_pvga$g_license2, ordered = TRUE, c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license", NA))
-
-# Recode compliance vars as factors
-merged_pvga$compliance_current <- factor(merged_pvga$compliance_current, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa", "not compliant"))
-
-merged_pvga$compliance_new_hybrid <- factor(merged_pvga$compliance_new_hybrid, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa",  "not compliant"))
-
-merged_pvga$compliance_new <- factor(merged_pvga$compliance_new, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: green oa", "not compliant"))
-
-# Recode journal_type as factor
-merged_pvga$journal_type <- factor(merged_pvga$journal_type, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Closed or insufficient information"))
 
 # Code which will allow for reproducible random reordering of rows (e.g. when getting rid of duplicates)
 set.seed(42)
@@ -173,10 +141,12 @@ open_access_categories_a_ref_bar <- open_access_categories_a_ref %>%
   ggplot(aes(x=ref, y=percent)) +
   geom_bar(aes(fill=open_access_categories2), stat = "identity", position = position_dodge2()) +
   scale_fill_manual(values = c("#F08900","#FBBB10", "#16978A","#FF5A5A")) +
-  ggtitle("Open Access Categories by REF Panel") +
+  ggtitle("Open Access Categories by discipline") +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-  theme(axis.title.x = element_text(face="bold", size=12, margin = margin(t=10)),
-             axis.text.x  = element_text(vjust=0.5, size=10)) +
+  theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
+        axis.text.x  = element_text(vjust=0.5, size=14),
+        title =  element_text(face="bold", size=16),
+        legend.text = element_text(size=14)) +
   labs(x="REF Panels", y= "% of all articles in panel", fill = "Open access") +
   scale_x_discrete(labels = c('A: M&LS', 'B: PS,E&M','C: SS', 'D: A&H'))
 
@@ -229,7 +199,7 @@ journal_type_j <- merged_pvga %>%
   adorn_totals("row")
 journal_type_j
 
-journal_type <- bind_cols(journal_type_a, journal_type_j) %>%
+journal_type <- join(journal_type_a, journal_type_j) %>%
   mutate(articles_per_journal = round(n...2 / n...6),1) %>%
   select(-5, -10)
 journal_type
@@ -265,13 +235,11 @@ journal_type_ref <- bind_cols(journal_type_a_ref, journal_type_j_ref) %>%
 openxlsx::write.xlsx(as.data.frame(journal_type_ref), 'journal_type_ref.xlsx')
 
 # Stacked bar chart
-journal_type_a_ref$Journal_Type <- factor(journal_type_a_ref$Journal_Type, ordered = TRUE, levels = c("pure gold", "hybrid", "closed", "Total"))
+journal_type_a_ref$journal_type <- factor(journal_type_a_ref$journal_type, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Closed or insufficient information", "Total"))
 journal_type_a_ref_bar <- journal_type_a_ref %>%
-  filter(Journal_Type != "Total") %>%
-  rename("A: M & LS" = "% A", "B: PS, E & M" = "% B", "C: SS" = "% C", "D: A & H" = "% D") %>%
-  pivot_longer(c("A: M & LS", "B: PS, E & M", "C: SS", "D: A & H")) %>%
-  ggplot(aes(x=name, y=value)) +
-  geom_bar(aes(fill=Journal_Type), stat = "identity", position = position_dodge2()) +
+  filter(journal_type != "Total") %>%
+  ggplot(aes(x=ref, y=percent)) +
+  geom_bar(aes(fill=journal_type), stat = "identity", position = position_dodge2()) +
   scale_fill_manual(values = c("#F08900","#FBBB10", "#FF5A5A")) +
   ggtitle("Journal Type by REF Panel") +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
@@ -316,6 +284,29 @@ rm(TA_j_ref, TA_a_ref)
 
 openxlsx::write.xlsx(as.data.frame(TA_ref), 'TA_ref.xlsx')
 
+# Bar chart for breakdown of articles in hybrid journals with TA and green
+impact_of_ta <- merged_pvga %>%
+  filter(journal_type == "Hybrid")
+
+impact_of_ta$impact_of_ta <- if_else(impact_of_ta$has_ta == "yes", "Hybrid gold in journal covered by TA", 
+                                     if_else(impact_of_ta$num_new_green == 1, "No TA but has compliant green route", "No TA or compliant green route"))
+
+impact_of_ta <- impact_of_ta %>%
+  count(impact_of_ta) %>%
+  mutate(hybrid_articles="Hybrid articles", percent_of_hybrid = round(n/105434*100,1))
+
+impact_of_ta_chart <- ggplot(impact_of_ta, aes(x = hybrid_articles, y = percent_of_hybrid, fill=impact_of_ta)) +
+         geom_bar(position = "stack", stat = "identity") +
+         scale_fill_manual(values = c("#FBBB10", "#16978A", "#FF5A5A"), name = "Impact of TA") +
+         ggtitle("Compliance of articles in hybrid \n journals if funding restricted \n to journals covered by a TA") +
+  theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
+        axis.text.x  = element_text(vjust=0.5, size=14),
+        title =  element_text(face="bold", size=15),
+        legend.text = element_text(size=14)) +
+  labs(x="Articles in Hybrid journals", y= "% of articles in hybrid journals")         
+         ggsave(impact_of_ta_chart, filename = "impact_of_ta_chart.png")
+                          
+                                   
 #XXXXXXXXXXX
 # POTENTIAL COMPLIANCE WITH CURRENT POLICY----
 
@@ -491,6 +482,31 @@ rm(compliance_new_ref_a, compliance_new_ref_j)
 
 openxlsx::write.xlsx(as.data.frame(compliance_new_ref), 'compliance_new_ref.xlsx')
 
+# Stacked bar chart for Compliancce by REF panel
+compliance_new_ref_a <- ref_panels %>%
+  filter(ref != "Missing" & ref != "") %>% 
+  group_by(ref) %>%
+  count(compliance_new, .drop = FALSE) %>%
+  mutate(round(percent = n/sum(n)*100,0))
+
+compliance_new_ref_a$ref[1:4] <- "M&LS"
+compliance_new_ref_a$ref[5:8] <- "PS,E&M"
+compliance_new_ref_a$ref[9:12] <- "SS"
+compliance_new_ref_a$ref[13:16] <- "A&H"
+compliance_new_ref_a$ref <- factor(compliance_new_ref_a$ref, ordered = TRUE, c("M&LS", "PS,E&M", "SS", "A&H"))
+
+compliance_new_ref_chart <- ggplot(compliance_new_ref_a, aes(fill=compliance_new, y = percent, x = ref)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
+  ggtitle("Compliance by Discipline in S2") +
+  theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
+        axis.text.x  = element_text(vjust=0.5, size=14),
+        title =  element_text(face="bold", size=16),
+        legend.text = element_text(size=14)) +
+  labs(x="Discipline", y= "% of articles")
+ggsave(compliance_new_ref_chart, filename = "compliance_new_ref_chart.png") 
+  
+
 # Tree map for Compliance by REF panel 
 compliance_new_ref_a <- ref_panels %>%
   filter(ref != "Missing" & ref != "") %>% 
@@ -559,8 +575,8 @@ compliance_new_ref_tree_refd <- compliance_new_ref_chart %>%
 
 
 # 3. compliant by publisher ----
-# Might want to think about just doing top publishers rather than top compliant vs non compliant
 
+# This code creates a table which shows all publishers ranked by the number of compliant articles they have in our sample, with several further breakdowns
 compliance_new_publisher <- NA
 compliance_new_publisher <- merged_pvga %>%
   filter(compliance_new != "not compliant", !is.na(publisher)) %>%
@@ -651,7 +667,7 @@ not_compliant_uoa <- units_of_assessment %>%
   adorn_totals("row")
 openxlsx::write.xlsx(as.data.frame(not_compliant_uoa), 'not_compliant_uoa.xlsx')
 
-# 6. Compliance by UOA ----
+# 6. Compliance by Unit of Assessment (Subject) ----
 units_of_assessment <- merged_pvga %>% pivot_longer(c(category_uoa1, category_uoa2), names_to = "uoa_all", values_to ="uoa")
 
 compliance_new_uoa <- units_of_assessment %>%
@@ -768,18 +784,114 @@ openxlsx::write.xlsx(as.data.frame(embargos), 'embargos.xlsx')
 #XXXXXXXX
 # IMPACT OF DIFFERENT POLICY SCENARIOS----
 
-# Identify articles which are compliant in different scenarios
+# Create stacked bar chart comparing actual OA and all three potential compliance scenarios (current, with HG, without HG)
 
-  
-  # Compliant with current policy but not Scenario 1 (new policy, hybrid supported)
-current_s1 <- merged_pvga %>%
-  filter(!(is.na(sherpa_id) & has_ta == "no"), compliance_current == "not compliant", compliance_new_hybrid != "not compliant")
+    # Current OA status
+open_access_categories_a <- merged_pvga %>% # article level
+  count(open_access_categories2) %>%
+  mutate(percent = round(n / sum(n) * 100),0)
 
-  # Compliant with current policy but not Scenario 2 (new policy, hybrid not supported)
+open_access_categories_j <- merged_pvga %>% # journal level
+  filter(!duplicated(journal_title)) %>%
+  count(open_access_categories2) %>%
+  mutate(percent = round(n / sum(n) * 100),0)
+
+    # Potential compliance with current policy
+compliance_current_a <- merged_pvga %>%
+  count(compliance_current, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0))
+
+compliance_current_j <- merged_pvga %>%
+  filter(!duplicated(journal_title)) %>% # NB code for creating merged data pseudo-randomly orders observations using set.seed(42), but any random order should work with only small variations in the n column.
+  count(compliance_current, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0))
+
+    # Scenario 1
+compliance_h_a <- merged_pvga %>%
+  count(compliance_new_hybrid, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0))
+
+compliance_h_j <- merged_pvga %>%
+  filter(!duplicated(journal_title)) %>%
+  count(compliance_new_hybrid, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0))
+
+    # Scenario 2
+compliance_new_a <- merged_pvga %>%
+  count(compliance_new, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0))
+
+compliance_new_j <- merged_pvga %>%
+  filter(!duplicated(journal_title)) %>%
+  count(compliance_new, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n) * 100)) %>%
+  mutate(cml = round(cumsum(percent),0)) %>%
+  mutate(percent = round(percent,0))
 
 
-  # Compliant with Scenario 1 but not Scenario 2
+      # Bind together figures for articles
+policy_impact_a <- bind_rows(compliance_current_a, compliance_h_a, compliance_new_a) %>%
+  mutate(Scenario = "Current") %>%
+  unite(Compliance_Route, c('compliance_current', 'compliance_new_hybrid', 'compliance_new'), na.rm = TRUE) %>%
+  relocate(5,1,2,3,4)
 
+policy_impact_a[5:8,'Scenario'] <- "S1"
+policy_impact_a[9:12,'Scenario'] <- "S2"
+policy_impact_a[c(1,5,9), 'Compliance_Route'] <- "Pure gold"
+policy_impact_a[c(2,6,10), 'Compliance_Route'] <- "Hybrid gold (with TA for S2)"
+policy_impact_a[c(3,7,11), 'Compliance_Route'] <- "Green OA"
+policy_impact_a[c(4,8,12), 'Compliance_Route'] <- "No route to compliance"
+policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c("Pure gold", "Hybrid gold (with TA for S2)", "Green OA", "No route to compliance"))
+
+      # Create stacked bar chart for articles
+
+policy_impact_a_bar <- ggplot(policy_impact_a, aes(fill=Compliance_Route, y=percent, x=Scenario)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
+  ggtitle("Impact of each policy scenario") +
+  theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
+        axis.text.x  = element_text(vjust=0.5, size=14),
+        title =  element_text(face="bold", size=16),
+        legend.text = element_text(size=14)) +
+  labs(x="Policy Scenarios", y= "% of articles")
+ggsave(policy_impact_a_bar, filename = "policy_impact_a_bar.png")
+
+    # Bind together figures for journals
+policy_impact_j <- bind_rows(compliance_current_j, compliance_h_j, compliance_new_j) %>%
+  mutate(Scenario = "Current") %>%
+  unite(Compliance_Route, c('compliance_current', 'compliance_new_hybrid', 'compliance_new'), na.rm = TRUE) %>%
+  relocate(5,1,2,3,4)
+
+policy_impact_j[5:8,'Scenario'] <- "S1"
+policy_impact_j[9:12,'Scenario'] <- "S2"
+policy_impact_j[c(1,5,9), 'Compliance_Route'] <- "Pure gold"
+policy_impact_j[c(2,6,10), 'Compliance_Route'] <- "Hybrid gold (with TA for S2)"
+policy_impact_j[c(3,7,11), 'Compliance_Route'] <- "Green OA"
+policy_impact_j[c(4,8,12), 'Compliance_Route'] <- "No route to compliance"
+policy_impact_j$Compliance_Route <- factor(policy_impact_j$Compliance_Route, ordered = TRUE, levels = c("Pure gold", "Hybrid gold (with TA for S2)", "Green OA", "No route to compliance"))
+
+# Create stacked bar chart for journals
+
+policy_impact_j_bar <- ggplot(policy_impact_j, aes(fill=Compliance_Route, y=percent, x=Scenario)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
+  ggtitle("Impact of each policy scenario") +
+  theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
+        axis.text.x  = element_text(vjust=0.5, size=14),
+        title =  element_text(face="bold", size=16),
+        legend.text = element_text(size=14)) +
+  labs(x="Policy Scenarios", y= "% of journals"))
+ggsave(policy_impact_j_bar, filename = "policy_impact_j_bar.png")
 
 #XXXXXXXX NOTHING FROM THIS POINT ON REQUIRES QA----
 # TESTING SHERPA RECORDS WITH NO REQUIREMENTS----
