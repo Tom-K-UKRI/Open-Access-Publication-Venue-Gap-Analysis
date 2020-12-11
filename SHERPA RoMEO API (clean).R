@@ -11,10 +11,6 @@
 # Clear work space
 rm(list=ls())
 
-# Set working directory
-mainDir <- "C:/Users/TKen02/UKRI/Policy Analysis - Documents/Open Access/Projects/Publication Venue Gap Analysis/Data/Original data"
-setwd(mainDir)
-
 #XXXXXXXXXXXXXXXX
 #1. DOWNLOAD FROM API----
 
@@ -24,7 +20,7 @@ library(jsonlite)
 library(tidyverse)
 
 # Set number of times to query api here (limit = 100, total of 30,969 records as of 25/09/20 so need 310 API calls to download all data - the reasons it is not literally the highest id number/ 100 is because there are quite a lot of id numbers with no journal, where presumably the journal has been deleted)
-max_api_calls <- 310 # if Sherpa add more records this may need to be increased (this gets you up to ID = 37990)
+max_api_calls <- 350 # if Sherpa add more records this may need to be increased (this gets you up to ID = 37990). You can always set it too high and them remove pages later on.
 
 # Add API key/ access token - this is Tom Kenny's token but easy to generate your own
 api_key <- "E46056F4-F72C-11EA-B80C-3822122D6054"
@@ -44,57 +40,23 @@ for(i in 1:max_api_calls){
   pages[[i]] <- page
 }
 
+# Remove additional pages not filled
+#pages <- pages[[1:312,]] # replace 312 with final page which has records
+
 # Combining queries into a single JSON file
 message("Combining queries")
 publications <- rbind_pages(pages)
-save(publications, file = "sherpa_publications")
+save(publications, file = "sherpa_publications.Rda")
 
 #XXXXXXXXXXXXXXXXXXX
 
 # 2. FILTERING JSON TO RETURN RELEVANT VARIABLES IN ACCESSIBLE FORM----
   #the original json data is very nested so needs work before it is useful - the goal here is to return one observation per journal policy
-
-# we need to run through journals one at a time so first set up page as one record
-page <- publications[1,] # i.e. page becomes the first journal rather than the first 100
-
-#a. initialise first record, selecting all relevant variables----
-title <- unnest(page, 'title') %>% select(title) %>% head(1)
-issn <- as.data.frame(page$issns) %>% mutate(row = row_number()) %>% select(type, issn, row) %>% pivot_wider(names_prefix='issn_', names_from = type, values_from = issn) %>% slice(1:2) %>% select(-row) %>% summarise_all(funs(first(na.omit(.)))) # this is needed because a few iterations of issn have duplicates
-doaj <- select(page, 'listed_in_doaj')
-sherpa_id <- select(page, 'id')
-sherpa_web <- select(page, 'system_metadata.uri')
-oa_prohibited <- as.data.frame(page$publisher_policy) %>% select(open_access_prohibited) %>% mutate(pubpol_id = seq_len(n()), title=title$title)
-publisher <- unnest(as.data.frame(page$publishers), 'publisher.name') %>% select(name)
-    
-    # this loop goes into the list of policies under permitted oa. For each one it returns all the elements of the policy we might be interested in
-if ('permitted_oa' %in% names(as.data.frame(page$publisher_policy))){
-  pubpol_list <- list()
-  for (k in 1:nrow(oa_prohibited)){
-    
-    pubpol_temp <- unnest(as.data.frame(page$publisher_policy)[k, ], 'permitted_oa') %>%
-      select(any_of(c('rowname', 'additional_oa_fee', 'article_version', 'additional_oa_fee', 'embargo.amount', 'embargo.units', 'license', 'copyright_owner', 'conditions', 'location.location'))) %>%
-      mutate(pubpol_id = k)
-    
-    pubpol_list[[k]] <- pubpol_temp
-    
-  }
-  
-  pubpol <- do.call(bind_rows, pubpol_list)
-  
-  pubpol_oa <- merge(oa_prohibited, pubpol, by='pubpol_id')
-  
-} else {
-    pubpol_oa <- oa_prohibited 
-  
-}
-    # we then merge the publisher policy information with the article metadata so that each policy has one row
-record <- merge(cbind(sherpa_id, title, issn, doaj, publisher, sherpa_web), pubpol_oa, by='title')
-records <- record
-
-#b. Run loop to repeat for all policies-----------------------------------
   # NB - some journals are skipped because their data is formatted in a way which does not allow the loop to run (see code with next for issn and publisher policy). However, this is a relative small number of cases.
 
-for(i in (1:30100)){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
+records <- NULL
+
+for(i in (30600:nrow(publications))){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
   
   page <- publications[i,]
   
@@ -115,6 +77,7 @@ for(i in (1:30100)){ # The number of records may need to change if this is run a
   if(is.null(oa_prohibited$open_access_prohibited)) {next} # this is needed because a number of rows return null values and break the loop
   oa_prohibited <- as.data.frame(page$publisher_policy) %>% select(open_access_prohibited) %>% mutate(pubpol_id = seq_len(n()), title=title$title)
   
+  if(page$publishers == "NULL") {next} # this is needed because one row returns a null value and breaks the loop
   publisher <- unnest(as.data.frame(page$publishers), 'publisher.name') %>% select(name)
   
   if ('permitted_oa' %in% names(as.data.frame(page$publisher_policy))){
@@ -172,4 +135,9 @@ for (i in 1:nrow(sherpa)) {
 
 #XXXXXXXXXXXXX
 # WRITE TO EXCEL----
-openxlsx::write.xlsx(as.data.frame(sherpa), 'sherpa_all_policies.xlsx')
+openxlsx::write.xlsx(as.data.frame(sherpa), 'Data/Raw Data/sherpa_all_policies2.xlsx')
+
+# SAVE AS .Rda
+save(sherpa, file = "Data/Raw Data/sherpa.Rda")
+
+
