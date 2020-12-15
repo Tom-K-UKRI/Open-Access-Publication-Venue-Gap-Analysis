@@ -50,6 +50,26 @@ dimensions$open_access_categories[grepl("Green, Accepted", dimensions$open_acces
 dimensions$open_access_categories[grepl("Green, Submitted", dimensions$open_access_categories)] <- "Green, submitted"
 dimensions$open_access_categories[grepl("Green, Published", dimensions$open_access_categories)] <- "Green, published"
 
+# Creating new variable ukri_funders pulling out the UKRI funders for each article and cleaning it up
+
+dimensions$AHRC[grepl("AHRC", dimensions$funders)] <- "AHRC"
+dimensions$BBSRC[grepl("BBSRC", dimensions$funders)] <- "BBSRC"
+dimensions$ESRC[grepl("ESRC", dimensions$funders)] <- "ESRC"
+dimensions$EPSRC[grepl("EPSRC", dimensions$funders)] <- "EPSRC"
+dimensions$Innovate_UK[grepl("Innovate UK", dimensions$funders)] <- "Innovate UK"
+dimensions$MRC[grepl("MRC", dimensions$funders)] <- "MRC"
+dimensions$NC3Rs[grepl("NC3Rs", dimensions$funders)] <- "NC3Rs"
+dimensions$NERC[grepl("NERC", dimensions$funders)] <- "NERC"
+dimensions$Research_England[grepl("Research England", dimensions$funders)] <- "Research England"
+dimensions$STFC[grepl("STFC", dimensions$funders)] <- "STFC"
+dimensions$UKRI[grepl("UKRI", dimensions$funders)] <- "UKRI"
+
+      #pull it all together into one column then remove NAs
+dimensions$ukri_funders <- paste(dimensions$AHRC, dimensions$BBSRC, dimensions$ESRC, dimensions$EPSRC, dimensions$Innovate_UK, dimensions$MRC, dimensions$NC3Rs, dimensions$NERC, dimensions$Research_England, dimensions$STFC, dimensions$UKRI, sep = ", ") 
+dimensions$ukri_funders <- gsub("NA, ", "", dimensions$ukri_funders)
+dimensions$ukri_funders <- gsub(", NA", "", dimensions$ukri_funders)
+rm(dimensions$AHRC, dimensions$BBSRC, dimensions$ESRC, dimensions$EPSRC, dimensions$Innovate_UK, dimensions$MRC, dimensions$NC3Rs, dimensions$NERC, dimensions$Research_England, dimensions$STFC, dimensions$UKRI)
+
 # creating category_uoa1 which will show only the first subject from category_uoa, then category uoa2 which will show only the second (where one exists). An example of a category_uoa with two UoAs is [{"id":"30011","name":"B11 Computer Science and Informatics"},{"id":"30012","name":"B12 Engineering"}]
 dimensions$category_uoa1 <- dimensions$category_uoa
 dimensions$category_uoa1 <- substr(dimensions$category_uoa1, 24, nchar(dimensions$category_uoa1)-3)
@@ -97,7 +117,7 @@ dimensions$open_access_categories2[dimensions$open_access_categories2 == "Bronze
 dimensions <- dimensions[,!(names(dimensions) %in% c("funder_countries","journal_id", "journal_lists", "research_org_countries", "supporting_grant_ids", "type", "year"))]
 
 # changing column order (if any new columns added they will need to be added here)
-col_order <- (c("title", "date", "journal_title", "publisher", "issn1", "issn2", "issn3", "issn4", "doi", "category_uoa", "category_uoa1", "category_uoa2", "ref_panel", "ref_panel2", "open_access_categories", "open_access_categories2", "funders", "linkout", "research_org_country_names"))
+col_order <- (c("title", "date", "journal_title", "publisher", "issn1", "issn2", "issn3", "issn4", "doi", "category_uoa", "category_uoa1", "category_uoa2", "ref_panel", "ref_panel2", "open_access_categories", "open_access_categories2", 'funders', "ukri_funders", "linkout", "research_org_country_names"))
 dimensions <- dimensions[, col_order]
 
 
@@ -200,7 +220,6 @@ sherpa$license2[sherpa$license2 != "cc_by" & sherpa$license2 != "cc_by_nd" & she
     # Binary license variable - is cc_by or isn't
 sherpa$license3[sherpa$license2 != "cc_by"] <- "not cc_by"
 sherpa$license3[sherpa$license2 == "cc_by"] <- "cc_by"
-
 
 #c. Preparing other variables to rank Sherpa policies ----
 
