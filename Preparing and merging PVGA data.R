@@ -19,108 +19,10 @@ library(openxlsx)
 library(xml2)
 library(rvest)
 
-######### 1. PREPARING DIMENSIONS DATA----
-# NB. This data was downloaded using the Dimensions API plugin for google sheets, with queries for each year in the format: "search publications where year in [2018:2018] and funders in ["grid.8682.4", "grid.14105.31", "grid.14467.30", "grid.418100.c", "grid.421091.f", "grid.423443.6", "grid.426413.6", "grid.434257.3", "grid.453088.2", "grid.496779.2"] and type in ["article"] return publications[type + category_uoa + date + dimensions_url + doi + funder_countries + funders + issn + journal + journal_lists + linkout + open_access_categories + publisher + research_org_countries + research_org_country_names + supporting_grant_ids + title  + year]"
+######### 1. IMPORTING DIMENSIONS DATA----
+# NB. This data was downloaded and cleaned in script "Downloading and cleaning Dimensions data"
 
-dimensions <- read.xlsx("Data/Dimensions 2017-2020.xlsx")
-# dimensions <- read.xlsx("Data/Dimensions_edited.xlsx") # this version has manually recoded values for open_access_categories as I couldn't rename the values because they had so many characters needing escaping (see also below)
-
-# Remove duplicate rows (using doi and title - the latter may remove a few different articles which have the same name but manual checks suggest the vast majority of duplicate titles are the same article or things like corrections and they skew very heavily towards open access)
-dimensions <- dimensions %>%
-  filter(!duplicated(doi))
-
-dimensions <- dimensions %>%
-  filter(!duplicated(title))
-
-# Lowercase journal_title to aid matching with Sherpa
-dimensions$journal_title <- tolower(dimensions$journal_title)
-
-# renaming values in research_org_country_names to leave only the names themselves
-dimensions <- dimensions %>%
-  mutate(research_org_country_names = gsub("\\[\"", "", research_org_country_names)) %>%
-  mutate(research_org_country_names = gsub("\",\"", ", ", research_org_country_names)) %>%
-  mutate(research_org_country_names = gsub("\"\\]", "", research_org_country_names))
-
-# renaming values in open_access_categories.
-dimensions$open_access_categories[grepl("Closed", dimensions$open_access_categories)] <- "Closed"
-dimensions$open_access_categories[grepl("Bronze", dimensions$open_access_categories)] <- "Bronze"
-dimensions$open_access_categories[grepl("Hybrid", dimensions$open_access_categories)] <- "Hybrid"
-dimensions$open_access_categories[grepl("Pure Gold", dimensions$open_access_categories)] <- "Pure gold"
-dimensions$open_access_categories[grepl("Green, Accepted", dimensions$open_access_categories)] <- "Green, accepted"
-dimensions$open_access_categories[grepl("Green, Submitted", dimensions$open_access_categories)] <- "Green, submitted"
-dimensions$open_access_categories[grepl("Green, Published", dimensions$open_access_categories)] <- "Green, published"
-
-# Creating new variable ukri_funders pulling out the UKRI funders for each article and cleaning it up
-
-dimensions$AHRC[grepl("AHRC", dimensions$funders)] <- "AHRC"
-dimensions$BBSRC[grepl("BBSRC", dimensions$funders)] <- "BBSRC"
-dimensions$ESRC[grepl("ESRC", dimensions$funders)] <- "ESRC"
-dimensions$EPSRC[grepl("EPSRC", dimensions$funders)] <- "EPSRC"
-dimensions$Innovate_UK[grepl("Innovate UK", dimensions$funders)] <- "Innovate UK"
-dimensions$MRC[grepl("MRC", dimensions$funders)] <- "MRC"
-dimensions$NC3Rs[grepl("NC3Rs", dimensions$funders)] <- "NC3Rs"
-dimensions$NERC[grepl("NERC", dimensions$funders)] <- "NERC"
-dimensions$Research_England[grepl("Research England", dimensions$funders)] <- "Research England"
-dimensions$STFC[grepl("STFC", dimensions$funders)] <- "STFC"
-dimensions$UKRI[grepl("UKRI", dimensions$funders)] <- "UKRI"
-
-      #pull it all together into one column then remove NAs
-dimensions$ukri_funders <- paste(dimensions$AHRC, dimensions$BBSRC, dimensions$ESRC, dimensions$EPSRC, dimensions$Innovate_UK, dimensions$MRC, dimensions$NC3Rs, dimensions$NERC, dimensions$Research_England, dimensions$STFC, dimensions$UKRI, sep = ", ") 
-dimensions$ukri_funders <- gsub("NA, ", "", dimensions$ukri_funders)
-dimensions$ukri_funders <- gsub(", NA", "", dimensions$ukri_funders)
-rm(dimensions$AHRC, dimensions$BBSRC, dimensions$ESRC, dimensions$EPSRC, dimensions$Innovate_UK, dimensions$MRC, dimensions$NC3Rs, dimensions$NERC, dimensions$Research_England, dimensions$STFC, dimensions$UKRI)
-
-# creating category_uoa1 which will show only the first subject from category_uoa, then category uoa2 which will show only the second (where one exists). An example of a category_uoa with two UoAs is [{"id":"30011","name":"B11 Computer Science and Informatics"},{"id":"30012","name":"B12 Engineering"}]
-dimensions$category_uoa1 <- dimensions$category_uoa
-dimensions$category_uoa1 <- substr(dimensions$category_uoa1, 24, nchar(dimensions$category_uoa1)-3)
-dimensions$category_uoa1[is.na(dimensions$category_uoa1)] <- "Missing"
-
-dimensions$category_uoa2 <- dimensions$category_uoa1
-dimensions$category_uoa2 <- gsub(".*{", "", dimensions$category_uoa2, perl=TRUE) # deleting the first subject (i.e. everything before {)
-dimensions$category_uoa2 <- gsub("^A.*", "", dimensions$category_uoa2) # deleting everything before the first letter of second subject to clean it up
-dimensions$category_uoa2 <- gsub("^B.*", "", dimensions$category_uoa2)
-dimensions$category_uoa2 <- gsub("^C.*", "", dimensions$category_uoa2)
-dimensions$category_uoa2 <- gsub("^D.*", "", dimensions$category_uoa2)
-dimensions$category_uoa2 <- gsub(".*name\":\"", "", dimensions$category_uoa2) # deleting the end of the string to clean it up
-dimensions$category_uoa2 <- gsub("Missing", "", dimensions$category_uoa2) # deleting missing from uoa2 since it's just that it doesn't have second subject rather than being missing
-dimensions$category_uoa1 <- gsub("\".*", "", dimensions$category_uoa1) # removing everything after first subject from uoa1
-
-# Creating derived variables ref_panel and ref panel2 corresponding to uoa_1 and uoa_2 (so we can do analysis at the level of REF panel rather than individual REF units of assessment/ disciplines).
-dimensions$ref_panel <- NA
-dimensions$ref_panel <- substr(dimensions$category_uoa1,1,1) # Selecting the first letter of the UoA (which is the REF panel letter)
-dimensions$ref_panel <- gsub("M", "Missing", dimensions$ref_panel) # Changing M back to missing
-dimensions$ref_panel2 <- NA
-dimensions$ref_panel2 <- substr(dimensions$category_uoa2,1,1) 
-
-  # Remove ref_panel2 for articles with the same ref panel twice (this will avoid double counting during analysis)
-for (i in 1:nrow(dimensions)) {
-  if (dimensions[i, 'ref_panel'] == dimensions[i, 'ref_panel2']) {dimensions[i, 'ref_panel2'] <- ""}
-  else next
-}
-
-# remove articles without an ISSN
-dimensions <- dimensions[!is.na(dimensions$issn), ]
-
-# creating new variables to return individual ISSNs in consistent format (8 numbers each - up to four per journal)
-dimensions <- dimensions %>% mutate(issn=str_extract_all(issn, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}")) %>%
-  separate(issn, into = c("issn1", "issn2", "issn3", "issn4"), sep = ",") %>%
-  mutate(issn1=str_extract_all(issn1, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}"), issn2=str_extract_all(issn2, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}"), issn3=str_extract_all(issn3, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}"), issn4=str_extract_all(issn4, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}")) %>%
-  mutate(issn1 = gsub("-","",issn1), issn2 = gsub("-","",issn2), issn3 = gsub("-","",issn3), issn4 = gsub("-","",issn4))
-
-# Recoding open_access_categories into simpler form
-dimensions$open_access_categories2 <- dimensions$open_access_categories
-dimensions$open_access_categories2[dimensions$open_access_categories2 == "Hybrid"] <- "Hybrid gold" # to avoid confusion with journal type
-dimensions$open_access_categories2[dimensions$open_access_categories2 == "Green, published" | dimensions$open_access_categories2 == "Green, accepted"] <- "Green"
-dimensions$open_access_categories2[dimensions$open_access_categories2 == "Bronze" | dimensions$open_access_categories2 == "Green, submitted" | dimensions$open_access_categories2 == "Closed"] <- "Closed" #since these are all closed from the perspective of UKRI policy
-
-# removing unneccessary columns
-dimensions <- dimensions[,!(names(dimensions) %in% c("funder_countries","journal_id", "journal_lists", "research_org_countries", "supporting_grant_ids", "type", "year"))]
-
-# changing column order (if any new columns added they will need to be added here)
-col_order <- (c("title", "date", "journal_title", "publisher", "issn1", "issn2", "issn3", "issn4", "doi", "category_uoa", "category_uoa1", "category_uoa2", "ref_panel", "ref_panel2", "open_access_categories", "open_access_categories2", 'funders', "ukri_funders", "linkout", "research_org_country_names"))
-dimensions <- dimensions[, col_order]
-
-
+load("Data/Dimensions.Rda")
 
 #XXXXXXXXXXX
 # 2. DOWNLOADING AND PREPARING ESAC DATA----
@@ -214,7 +116,6 @@ sherpa$license1[grepl("allrightsreserved,", sherpa$license1)] <- "all_rights_res
   
     # Simplify license further into new var license2 merging all licenses which are never compliant in the new policy scenarios
 sherpa$license2 <- sherpa$license1
-sherpa$license2[sherpa$license2 == "no license requirement"] <- "cc_by"
 sherpa$license2[sherpa$license2 != "cc_by" & sherpa$license2 != "cc_by_nd" & sherpa$license2 != "cc_by_nc"] <- "no compliant license"
 
     # Binary license variable - is cc_by or isn't
@@ -263,7 +164,7 @@ sherpa_green <- sherpa %>%
 require(utils)
 
       # Use expand.grid to create table with every option. NB. The order of both the variables and strings is important here - the most important variables need to come last for the ordering to work and the most permissive options need to come first within each string.
-green_ranking <- expand.grid(version_published = c(TRUE, FALSE), copyright = c("authors", "publishers"), compliant_repository = c(TRUE, FALSE), embargo2 = c(0, 6, 12, 13), license2 = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license"), embargo3 = c("zero embargo", "has embargo"), license3 = c("cc_by", "not cc_by"))
+green_ranking <- expand.grid(version_published = c(TRUE, FALSE), copyright = c("authors", "publishers"), compliant_repository = c(TRUE, FALSE), embargo2 = c(0, 6, 12, 13), license1 = c("cc_by", "cc_by_nd", "cc_by_nc", "cc_by_sa", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke license", "all rights reserved", "no license requirement"), embargo3 = c("zero embargo", "has embargo"), license3 = c("cc_by", "not cc_by"))
 
       # Since the observations are ordered by permissiveness, this code simply adds a number for each row which will be the rank
 green_ranking <- green_ranking %>%
@@ -399,7 +300,7 @@ merged_pvga <- left_join(merged_pvga, articles_per_journal, by = "journal_title"
 merged_pvga <- merged_pvga %>% filter(!is.na(sherpa_id))
 
 # Remove unnecessary variables (these were mostly metadata not used for analysis or only needed for testing)
-merged_pvga <- subset(merged_pvga, select = -c(date, issn1, issn2, issn3, issn4, category_uoa, funders, linkout, issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner, g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions))
+merged_pvga <- subset(merged_pvga, select = -c(issn1, issn2, issn3, issn4, issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner, g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions))
 
 #XXXXXXXXXXXXX
 #7. CREATE COMPLIANCE VARIABLES TO INDICATE COMPLIANCE WITH DIFFERENT POLICY SCENARIOS
@@ -417,15 +318,14 @@ compliance_fee <- compliance_fee %>%
 
   # Table 2: compliance with green OA in current policy
 
-    # Need to derive temporary variable for articles in REF panel D
-merged_pvga$ref_panel_d <- NA
-merged_pvga$ref_panel_d[merged_pvga$ref_panel == "D"] <- TRUE
-merged_pvga$ref_panel_d[merged_pvga$ref_panel2 == "D"] <- TRUE
+    # There is an exception in the current policy for researchers funded by AHRC and ESRC, so need to derive a temporary variable for this
+merged_pvga$embargo_exception <- NA
+merged_pvga$embargo_exception[merged_pvga$ukri_funders %in% "AHRC" | merged_pvga$ukri_funders %in% "ESRC"] <- TRUE
 
 compliance_current_green <- expand.grid(
   g_embargo2 = c(0, 6, 12, 13),
-  ref_panel_d = c(TRUE, NA),
-  g_license2 = c("cc_by", "cc_by_nc", "no compliant license")) # this will lead to one article with NA as there is one cc_by_nd, but including it would make the table much more complex)
+  embargo_exception = c(TRUE, NA),
+  g_license2 = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license"))
 
 compliance_current_green <- compliance_current_green %>%
   mutate(num_current_green = 1:nrow(compliance_current_green))
@@ -433,7 +333,7 @@ compliance_current_green <- compliance_current_green %>%
   # Table 3: compliance with green OA in new policy
 compliance_new_green <- expand.grid(
   g_embargo3 = c("zero embargo", "has embargo"),
-  g_license3 = c("cc_by", "not cc_by")) # this will lead to one article with NA as there is one cc_by_nd, but including it would make the table much more complex)
+  g_license2 = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license")) # this will lead to one article with NA as there is one cc_by_nd, but including it would make the table much more complex)
 
 compliance_new_green <- compliance_new_green %>%
   mutate(num_new_green = 1:nrow(compliance_new_green))
@@ -447,7 +347,7 @@ merged_pvga$num_current_green[is.na(merged_pvga$num_current_green)] <- 99
 merged_pvga$num_new_green[is.na(merged_pvga$num_new_green)] <- 99
 
 merged_pvga <- merged_pvga %>%
-  select(-ref_panel_d) # this var was only created to aid with the ranking/ join
+  select(-embargo_exception) # this var was only created to aid with the ranking/ join
 
 #b. Potential compliance with current policy----
 # This looks at whether the most permissive policies for each journal/ article should provide a route to compliance with the current UKRI policy. Routes to compliance with this policy are:
@@ -456,12 +356,15 @@ merged_pvga <- merged_pvga %>%
 merged_pvga$compliance_current <- NA
 merged_pvga$compliance_current[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_current[merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold"
-merged_pvga$compliance_current[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_current_green %in% c(1,2,3,5,6,9,10,11,13,14)] <- "c: green oa"
+merged_pvga$compliance_current[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_current_green %in% c(1,2,3,5,6,9,10,11,13,14,17,18,19,21,22)] <- "c: confirmed green oa"
+merged_pvga$compliance_current[!merged_pvga$num_fee %in% c(1,2,4,5) & !merged_pvga$num_current_green %in% c(1,2,3,5,6,9,10,11,13,14,17,18,19,21,22) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_current[is.na(merged_pvga$compliance_current)] <- "not compliant"
 
     # simplified binary version of compliance_current (to make analysis tables/ charts easier)
 merged_pvga$compliance_current2 <- merged_pvga$compliance_current
-merged_pvga$compliance_current2[merged_pvga$compliance_current2 != "not compliant"] <- "compliant"
+merged_pvga$compliance_current2[merged_pvga$compliance_current2 != "not compliant" & merged_pvga$compliance_current2 != "nc: unconfirmed green oa"] <- "compliant"
+merged_pvga$compliance_current2[merged_pvga$compliance_current2 == "not compliant" | merged_pvga$compliance_current2 == "nc: unconfirmed green oa"] <- "not compliant"
+
 
 #c. Potential compliance with new policy scenario 1 (hybrid gold allowed)----
   # This looks at whether the most permissive policies for each journal/ article should provide a route to compliance with the current UKRI policy.   Routes to compliance with this policy are:
@@ -472,13 +375,15 @@ merged_pvga$compliance_current2[merged_pvga$compliance_current2 != "not complian
 merged_pvga$compliance_new_hybrid <- NA
 merged_pvga$compliance_new_hybrid[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_hybrid[merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold"
-merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_new_green == 1] <- "c: green oa"
+merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,2,4,5) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
+merged_pvga$compliance_new_hybrid[!merged_pvga$num_fee %in% c(1,2,4,5) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_hybrid[is.na(merged_pvga$compliance_new_hybrid)] <- "not compliant"
 
     # simplified binary version of compliance_new_hybrid
 
 merged_pvga$compliance_new_hybrid2 <- merged_pvga$compliance_new_hybrid
-merged_pvga$compliance_new_hybrid2[merged_pvga$compliance_new_hybrid3 != "not compliant"] <- "compliant"
+merged_pvga$compliance_new_hybrid2[merged_pvga$compliance_new_hybrid2 != "not compliant" & merged_pvga$compliance_new_hybrid2 != "nc: unconfirmed green oa"] <- "compliant"
+merged_pvga$compliance_new_hybrid2[merged_pvga$compliance_new_hybrid2 == "not compliant" | merged_pvga$compliance_new_hybrid2 == "nc: unconfirmed green oa"] <- "not compliant"
 
 #d. Potential compliance with new policy scenario 2 (no hybrid gold)----
 # This looks at whether the most permissive policies for each journal/ article should provide a route to compliance with the current UKRI policy. Routes to compliance with this policy are:
@@ -489,13 +394,15 @@ merged_pvga$compliance_new_hybrid2[merged_pvga$compliance_new_hybrid3 != "not co
 merged_pvga$compliance_new <- NA
 merged_pvga$compliance_new[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new[merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
-merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green == 1] <- "c: green oa"
+merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
+merged_pvga$compliance_new[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$has_ta == "yes" & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new[is.na(merged_pvga$compliance_new)] <- "not compliant"
 
     # simplified binary version of compliance_new
 
 merged_pvga$compliance_new2 <- merged_pvga$compliance_new
-merged_pvga$compliance_new2[merged_pvga$compliance_new2 != "not compliant"] <- "compliant"
+merged_pvga$compliance_new2[merged_pvga$compliance_new2 != "not compliant" & merged_pvga$compliance_new2 != "nc: unconfirmed green oa"] <- "compliant"
+merged_pvga$compliance_new2[merged_pvga$compliance_new2 == "not compliant" | merged_pvga$compliance_new2 == "nc: unconfirmed green oa"] <- "not compliant"
 
 
 #####e. Final edits to merged_pvga (including creating factors)----
@@ -513,15 +420,15 @@ merged_pvga$g_embargo3 <- factor(merged_pvga$g_embargo3, ordered = TRUE, levels 
 merged_pvga$g_compliant_repository <- factor(merged_pvga$g_compliant_repository, ordered = TRUE, levels = c(TRUE, FALSE))
 
 # Turn license vars into factor to order by permissiveness (just to make outputs clearer)
-merged_pvga$g_license1 <- factor(merged_pvga$g_license1, ordered = TRUE, c("no license requirement", "cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke license", NA))
+merged_pvga$g_license1 <- factor(merged_pvga$g_license1, ordered = TRUE, c("cc_by", "cc_by_nd", "cc_by_nc", "cc_by_sa", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke_license", "all_rights_reserved", "no license requirement", NA))
 merged_pvga$g_license2 <- factor(merged_pvga$g_license2, ordered = TRUE, c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license", NA))
 
 # Recode compliance vars as factors
-merged_pvga$compliance_current <- factor(merged_pvga$compliance_current, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa", "not compliant"))
+merged_pvga$compliance_current <- factor(merged_pvga$compliance_current, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: confirmed green oa", "nc: unconfirmed green oa", "not compliant"))
 
-merged_pvga$compliance_new_hybrid <- factor(merged_pvga$compliance_new_hybrid, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: green oa",  "not compliant"))
+merged_pvga$compliance_new_hybrid <- factor(merged_pvga$compliance_new_hybrid, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: confirmed green oa", "nc: unconfirmed green oa",  "not compliant"))
 
-merged_pvga$compliance_new <- factor(merged_pvga$compliance_new, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: green oa", "not compliant"))
+merged_pvga$compliance_new <- factor(merged_pvga$compliance_new, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "not compliant"))
 
 # Recode journal_type as factor
 merged_pvga$journal_type <- factor(merged_pvga$journal_type, ordered = TRUE, levels = c("Pure gold", "Hybrid", "Closed or insufficient information"))
@@ -535,7 +442,7 @@ merged_pvga <- merged_pvga[rows, ]
 #XXXXXXXXXX
 # 7. WRITE MERGED_PVGA TO EXCEL AND RDA ----
 
-openxlsx::write.xlsx(as.data.frame(merged_pvga), 'Data/Raw data/merged_pvga.xlsx')
-save(merged_pvga, file = "Data/Raw Data/merged_pvga.Rda")
+openxlsx::write.xlsx(as.data.frame(merged_pvga), 'Data/merged_pvga.xlsx')
+save(merged_pvga, file = "Data/merged_pvga.Rda")
 
 # Merged PVGA: We have a Sherpa link for 98.4% of the publications in the Dimensions sample. We have green (no fee) routes for almost all of these and paid (fee) routes for about three-fifths. This leaves us with 2368 articles in Dimensions not covered by Sherpa data (made up of 844 journals). merged_pvga excludes all articles without a sherpa link, leaving 145,925 articles in 8896 journals
