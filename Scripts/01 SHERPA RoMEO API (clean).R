@@ -2,8 +2,8 @@
 
 # Author: Tom Kenny
 # Created: August 2020
-# Last Updated: November 2020
-# Last ran: 24.11.202
+# Last Updated: March 2021
+# Last ran: 29.03.2021
 
 # Purpose of code: to download information on journals' open access policies from the SHERPA API
 
@@ -18,9 +18,11 @@ rm(list=ls())
 library(httr)
 library(jsonlite)
 library(tidyverse)
+library(readr)
 
-# Set number of times to query api here (limit = 100, total of 30,969 records as of 25/09/20 so need 310 API calls to download all data - the reasons it is not literally the highest id number/ 100 is because there are quite a lot of id numbers with no journal, where presumably the journal has been deleted)
-max_api_calls <- 350 # if Sherpa add more records this may need to be increased (this gets you up to ID = 37990). You can always set it too high and them remove pages later on.
+# Set number of times to query api here (limit = 100 per page) - the reasons it is not literally the highest id number/ 100 is because there are quite a lot of id numbers with no journal, where presumably the journal has been deleted). as of 29.03.21 there are 317 pages of results available
+
+max_api_calls <- 400 # if Sherpa add more records this may need to be increased. You can always set it too high and them remove pages later on.
 
 # Add API key/ access token - this is Tom Kenny's token but easy to generate your own
 api_key <- "E46056F4-F72C-11EA-B80C-3822122D6054"
@@ -41,12 +43,12 @@ for(i in 1:max_api_calls){
 }
 
 # Remove additional pages not filled
-#pages <- pages[[1:312,]] # replace 312 with final page which has records
+#pages <- pages[1:317] # if updating replace 317 with final page which has records
 
-# Combining queries into a single JSON file
+# Combining queries into a single JSON file and saving out as .Rda
 message("Combining queries")
 publications <- rbind_pages(pages)
-save(publications, file = "sherpa_publications.Rda")
+save(publications, file = "Data/Raw data/sherpa_publications_json.Rda") # TK: to preserve this since download takes so long
 
 #XXXXXXXXXXXXXXXXXXX
 
@@ -56,7 +58,7 @@ save(publications, file = "sherpa_publications.Rda")
 
 records <- NULL
 
-for(i in (30600:nrow(publications))){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
+for(i in (31147:nrow(publications))){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
   
   page <- publications[i,]
   
@@ -64,7 +66,12 @@ for(i in (30600:nrow(publications))){ # The number of records may need to change
   
   issn <- as.data.frame(page$issns)
   if(is.null(issn$type)) {next} # this is needed because a number of rows return null values and break the loop
-  issn <- as.data.frame(page$issns) %>% mutate(row = row_number()) %>% select(type, issn, row) %>% pivot_wider(names_prefix='issn_', names_from = type, values_from = issn) %>% slice(1:2) %>% select(-row) %>% summarise_all(funs(first(na.omit(.)))) # this is needed because a few iterations of issn have duplicates
+
+  issn <- as.data.frame(page$issns) %>% mutate(row = row_number()) 
+
+  if(!"issn" %in% colnames(issn)) {next} # this is needed as one of the records didn't have an issn column
+  
+  issn <- issn %>% select(type, issn, row) %>% pivot_wider(names_prefix='issn_', names_from = type, values_from = issn) %>% slice(1:2) %>% select(-row) %>% summarise_all(funs(first(na.omit(.)))) # this is needed because a few iterations of issn have duplicates
   
   
   doaj <- select(page, 'listed_in_doaj')
@@ -133,9 +140,56 @@ for (i in 1:nrow(sherpa)) {
   else next
 } # This loop converts all embargo length into the same unit (months)
 
+# Editing license variable to change from nested list to string
+for (i in 1:nrow(sherpa)) {
+  license <- as.data.frame(sherpa[i,'license'])
+  if(is.null(license[i,'license'])) {sherpa[i, 'license'] = ""}
+  sherpa[i,'license'] = paste(license$license, collapse = ", ")
+  if(i %% 250 == 0) {message(i)}
+  next
+}
+
+sherpa$license <- as.character(sherpa$license)
+
+# Editing article version variable to change from list to string
+for (i in 1:nrow(sherpa)) {
+  if(sherpa[i,'article_version'] == "NULL") {sherpa[i, 'article_version'] = ""}
+  version <- as.data.frame(sherpa[i,'article_version'])
+  sherpa[i,'article_version'] = paste(version[,1], collapse = ", ")
+  if(i %% 250 == 0) {message(i)}
+  next
+}
+
+sherpa$article_version <- as.character(sherpa$article_version)
+
+# Editing conditions variable to change from list to string
+for (i in 1:nrow(sherpa)) {
+  if(sherpa[i,'conditions'] == "NULL") {sherpa[i,'conditions'] = ""}
+  condition <- as.data.frame(sherpa[i,'conditions'])
+  sherpa[i,'conditions'] = paste(condition[,1], collapse = ", ")
+  if(i %% 250 == 0) {message(i)}
+  next
+}
+
+sherpa$conditions <- as.character(sherpa$conditions)
+
+
+# Editing location.location variable to change from list to string
+for (i in 1:nrow(sherpa)) {
+  if(sherpa[i,'location.location'] == "NULL") {sherpa[i, 'location.location'] = ""}
+  location <- as.data.frame(sherpa[i,'location.location'])
+  sherpa[i,'location.location'] = paste(location[,1], collapse = ", ")
+  if(i %% 250 == 0) {message(i)}
+  next
+}
+
+sherpa$location.location <- as.character(sherpa$location.location)
+
 #XXXXXXXXXXXXX
-# WRITE TO EXCEL----
-openxlsx::write.xlsx(as.data.frame(sherpa), 'Data/Raw Data/sherpa_all_policies2.xlsx')
+# WRITE TO TSV (can't be CSV as commas in values)----
+write_tsv(sherpa, file = 'Data/Raw Data/sherpa_all_policies.tsv')
+
+openxlsx::write.xlsx(as.data.frame(sherpa), 'Data/Raw Data/sherpa_all_policies.xlsx')
 
 # SAVE AS .Rda
 save(sherpa, file = "Data/Raw Data/sherpa.Rda")

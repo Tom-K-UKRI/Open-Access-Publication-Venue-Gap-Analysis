@@ -13,9 +13,6 @@
 # Clear work space
 rm(list=ls())
 
-# Set working directory
-mainDir <- "C:\\Users\\TKen02\\UKRI\\Policy Analysis - Documents\\Open Access\\Projects\\Publication Venue Gap Analysis\\Data\\Original data\\GtR"
-setwd(mainDir)
 
 library(tidyverse)
 library(openxlsx)
@@ -23,8 +20,8 @@ library(openxlsx)
 
 #XXXXXXXXX
 # Import data----
-gtr18 <- read.xlsx("gtr_ukri_2018.xlsx")
-dim18 <- read.xlsx("dim_ukri_2018.xlsx")
+gtr18 <- read.xlsx("Data/Raw data/gtr_ukri_2018.xlsx")
+dim18 <- read.xlsx("Data/Raw data/dim_ukri_2018.xlsx") # when updating be careful to include all UKRI Dimensions (NOT UK filtered)
 
 # Format data----
 
@@ -70,6 +67,10 @@ gtr_test <- bind_rows(gtr_test0, gtr_test3) # this has 35945
 
 # Characteristics of GtR articles with no match in Dimensions----
 
+no_dim_match <- gtr_test0 %>%
+  count() %>%
+  mutate(percent = round(n/nrow(gtr18)*100,1))
+
   # Funder
 no_dim_match_funder <- gtr_test0 %>%
   count(FundingOrg) %>%
@@ -82,6 +83,11 @@ gtr_funder <- gtr18 %>%
 no_dim_match_funder <- bind_cols(no_dim_match_funder, gtr_funder) %>%
   rename(n_no_match = n...2, percent_no_match = percent...3, percent_all_gtr = percent...6) %>%
   select(-4,-5)
+
+no_dim_match_funder <- no_dim_match_funder %>%
+  mutate(prop_missing = round(n_no_match / gtr_funder$n*100,1))
+
+
 
       # Articles with no match in dimensions are 3 times more likely to be funded by AHRC and almost 3 times more likely to be funded by ESRC. Conversely the proportion of articles funded by MRC without a match in Dimensions is half the proportion in the full data. I.e. an article funded by MRC is 6 times less likely not to have a match than one funded by AHRC. 
 

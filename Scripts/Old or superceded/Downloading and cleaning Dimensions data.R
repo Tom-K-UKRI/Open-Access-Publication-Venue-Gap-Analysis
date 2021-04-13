@@ -4,6 +4,10 @@ library(dplyr)
 library(stringr)
 library(tidyr)
 
+#XXXXXXXXXXXXXXX
+# Clear work space
+rm(list=ls())
+
 # Import and collate dimensions data----
   # from google sheets prepared for each year using Dimensions Google Sheets API with query in format = "search publications where year in [2017:2017] and funders in ["grid.8682.4", "grid.14105.31", "grid.14467.30", "grid.418100.c", "grid.421091.f", "grid.423443.6", "grid.426413.6", "grid.434257.3", "grid.453088.2", "grid.496779.2"] and type in ["article"] return publications[type + category_for + date + dimensions_url + doi + funder_countries + funders + issn + journal + linkout + open_access_categories + publisher + research_org_country_names + supporting_grant_ids + title  + year]"
   # Needs to be done by year and then merged because each query has limit of 50,000 returns
@@ -48,6 +52,12 @@ dimensions$open_access_categories[grepl("Green, Accepted", dimensions$open_acces
 dimensions$open_access_categories[grepl("Green, Submitted", dimensions$open_access_categories)] <- "Green, submitted"
 dimensions$open_access_categories[grepl("Green, Published", dimensions$open_access_categories)] <- "Green, published"
 
+# Recoding open_access_categories into simpler form
+dimensions$open_access_categories2 <- dimensions$open_access_categories
+dimensions$open_access_categories2[dimensions$open_access_categories2 == "Hybrid"] <- "Hybrid gold" # to avoid confusion with journal type
+dimensions$open_access_categories2[dimensions$open_access_categories2 == "Green, published" | dimensions$open_access_categories2 == "Green, accepted"] <- "Green"
+dimensions$open_access_categories2[dimensions$open_access_categories2 == "Bronze" | dimensions$open_access_categories2 == "Green, submitted" | dimensions$open_access_categories2 == "Closed"] <- "Closed" #since these are all closed from the perspective of UKRI policy
+
 # Creating new variable ukri_funders pulling out the UKRI funders for each article and cleaning it up (these will later be merged into ukri_funders and then removed)
 dimensions$AHRC[grepl("AHRC", dimensions$funders)] <- "AHRC"
 dimensions$BBSRC[grepl("BBSRC", dimensions$funders)] <- "BBSRC"
@@ -80,11 +90,11 @@ dimensions <- dimensions %>% mutate(for_division = str_extract_all(category_for,
          for_division4 = gsub('")', "", for_division4, fixed = TRUE))
 
 dimensions <- dimensions %>%
-  mutate(for_division = paste(for_division1, for_division2, for_division3, for_division4, sep = ", ")) %>%
-  mutate(for_division = gsub("NA, ", "", for_division),
-         for_division = gsub(", NA", "", for_division))
+  mutate(for_division = paste(for_division1, for_division2, for_division3, for_division4, sep = ",,")) %>%
+  mutate(for_division = gsub("NA,,", "", for_division),
+         for_division = gsub(",,NA", "", for_division))
 
-dimensions$for_division[dimensions$for_division == "NA"] <- "Missing"
+dimensions$for_division[dimensions$for_division == "NA "] <- "Missing"
 
   # Pull out groups (dimensions$for_group)
 dimensions <- dimensions %>% mutate(for_group = str_extract_all(category_for, "\"[0-9]{4}[:space:]{1}.+?(?=\")")) %>%
@@ -98,9 +108,9 @@ dimensions <- dimensions %>% mutate(for_group = str_extract_all(category_for, "\
          for_group4 = gsub('")', "", for_group4, fixed = TRUE))
 
 dimensions <- dimensions %>%
-  mutate(for_group = paste(for_group1, for_group2, for_group3, for_group4, sep = ", ")) %>%
-  mutate(for_group = gsub("NA, ", "", for_group),
-         for_group = gsub(", NA", "", for_group))
+  mutate(for_group = paste(for_group1, for_group2, for_group3, for_group4, sep = ",,")) %>%
+  mutate(for_group = gsub("NA,,", "", for_group),
+         for_group = gsub(",,NA", "", for_group))
 
 dimensions$for_group[dimensions$for_group == "NA"] <- "Missing"
 
@@ -124,9 +134,9 @@ dimensions$arts_humanities <- NA
 dimensions$arts_humanities[grep(paste(arts_humanities, collapse = "|"), dimensions$for_division)] <- "Arts & Humanities"
 
 dimensions <- dimensions %>%
-  mutate(discipline = paste(physical, health, social, life, arts_humanities, sep = ", ")) %>%
-  mutate(discipline = gsub("NA, ", "", discipline),
-         discipline = gsub(", NA", "", discipline))
+  mutate(discipline = paste(physical, health, social, life, arts_humanities, sep = ",,")) %>%
+  mutate(discipline = gsub("NA,,", "", discipline),
+         discipline = gsub(",,NA", "", discipline))
 
 dimensions$discipline[dimensions$discipline == "NA"] <- "Missing"
 
@@ -141,19 +151,17 @@ dimensions_disciplines$n[Discipline == "Social Sciences"] <- sum(str_count(dimen
 dimensions_disciplines$n[Discipline == "Life Sciences"] <- sum(str_count(dimensions$discipline, "Life Sciences"))
 dimensions_disciplines <- dimensions_disciplines %>%
   mutate(percent=round(n/sum(n)*100,1))
-         
+
+
+# Editing publisher to split up Springer and Nature (this is important because as of Mar 2021 former has TA and latter doesn't)     
+dimensions$publisher[dimensions$publisher == "Springer Nature" & grepl("nature", dimensions$journal_title)] <- "Nature"
+dimensions$publisher[dimensions$publisher == "Springer Nature" & !grepl("nature", dimensions$journal_title)] <- "Springer"
 
 # creating new variables to return individual ISSNs in consistent format (8 numbers each - up to four per journal)
 dimensions <- dimensions %>% mutate(issn=str_extract_all(issn, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}")) %>%
   separate(issn, into = c("issn1", "issn2", "issn3", "issn4"), sep = ",") %>%
   mutate(issn1=str_extract_all(issn1, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}"), issn2=str_extract_all(issn2, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}"), issn3=str_extract_all(issn3, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}"), issn4=str_extract_all(issn4, "[0-9A-Za-z]{4}-[0-9A-Za-z]{4}")) %>%
   mutate(issn1 = gsub("-","",issn1), issn2 = gsub("-","",issn2), issn3 = gsub("-","",issn3), issn4 = gsub("-","",issn4))
-
-# Recoding open_access_categories into simpler form
-dimensions$open_access_categories2 <- dimensions$open_access_categories
-dimensions$open_access_categories2[dimensions$open_access_categories2 == "Hybrid"] <- "Hybrid gold" # to avoid confusion with journal type
-dimensions$open_access_categories2[dimensions$open_access_categories2 == "Green, published" | dimensions$open_access_categories2 == "Green, accepted"] <- "Green"
-dimensions$open_access_categories2[dimensions$open_access_categories2 == "Bronze" | dimensions$open_access_categories2 == "Green, submitted" | dimensions$open_access_categories2 == "Closed"] <- "Closed" #since these are all closed from the perspective of UKRI policy
 
 # changing column order (this also serves to remove unnecessary columns. If any new columns added they will need to be added here)
 col_order <- (c("title", "date", "journal_title", "publisher", "issn1", "issn2", "issn3", "issn4", "doi", "category_for", "for_division", "for_group", "discipline", "open_access_categories", "open_access_categories2", "ukri_funders"))
