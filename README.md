@@ -5,7 +5,7 @@ This repository documents the process used to download, merge, clean and analyse
 # Workflow
 The workflow used to generate the merged publication venue gap analysis data.
 
-![](Scripts/OA Gap Analysis.svg)
+![](OA Gap Analysis.svg)
 
 # Setting up the project folder
 The first step was/ is to create an RStudio project file (see blog on this here https://martinctc.github.io/blog/rstudio-projects-and-working-directories-a-beginner's-guide/), along with subfolders for 
