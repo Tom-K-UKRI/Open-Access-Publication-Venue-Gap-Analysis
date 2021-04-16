@@ -58,7 +58,7 @@ save(publications, file = "Data/Raw data/sherpa_publications_json.Rda") # TK: to
 
 records <- NULL
 
-for(i in (31147:nrow(publications))){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
+for(i in (1:nrow(publications))){ # The number of records may need to change if this is run again, however exclude was not working with an nrow command
   
   page <- publications[i,]
   

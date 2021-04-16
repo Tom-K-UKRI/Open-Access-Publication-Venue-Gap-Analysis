@@ -224,12 +224,12 @@ TA_ukri_funder <- ukri_funders %>%
   filter(!is.na(ukri_funder), journal_type == "Hybrid") %>%
   group_by(ukri_funder) %>%
   count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100),1) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
   filter(has_ta == "yes")
 
 # Merge in with compliance_new_ukri_funder to add TA column
 compliance_new_ukri_funder_ta <- bind_cols(compliance_new_ukri_funder, TA_ukri_funder) %>%
-  select(-c(9,10,11,13)) %>%
+  select(-c(9,10,11)) %>%
   rename(percent_hybrid_with_TA = percent)
 
 # Add all articles row (this feels very elaborate but I couldn't think of a simpler way to do it)
@@ -243,7 +243,6 @@ compliance_all_articles <- as.data.frame(lapply(compliance_all_articles,as.numer
 compliance_all_articles <- compliance_all_articles %>%
   mutate(total_supported = sum(across(1:3))) %>%
   relocate(7)
-  
 
 ta_all_hybrid <- merged_pvga %>% filter(journal_type == "Hybrid") %>% count(has_ta) %>% mutate(percent_hybrid_with_TA = round(n/sum(n)*100),1) %>% filter(has_ta == "yes")
 
@@ -449,7 +448,7 @@ articles_per_publisher <- merged_pvga %>%
   count(Publisher, sort = TRUE)
 
 not_compliance_new_publisher <- left_join(not_compliance_new_publisher, articles_per_publisher, by = "Publisher") %>%
-  mutate(percent_of_publisher_total = round(n.x / n.y * 100),1) %>%
+  mutate(percent_of_publisher_total = round(n.x / n.y * 100,1)) %>%
   select(-5)
 openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher), 'Output/Tables/not_compliant_new_publisher.xlsx')
 
@@ -496,8 +495,6 @@ merged_pvga$ta_split <- "No TA"
 merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2019] <- "2019"
 merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2020] <- "2020"
 merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2021] <- "2021"
-merged_pvga$ta_split[merged_pvga$Publisher == "Nature"] <- "Nature"
-merged_pvga$ta_split[merged_pvga$Publisher == "Elsevier"] <- "Elsevier"
 
 # Create stacked bar chart comparing potential compliance with several different assumptions about coverage of Transformative Agreements
 
@@ -533,9 +530,9 @@ compliance_new_ta_2019_a <- merged_pvga %>%
   # Transformative agreements to end of 2020
 merged_pvga$compliance_new_ta_2020 <- NA
 merged_pvga$compliance_new_ta_2020[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
-merged_pvga$compliance_new_ta_2020[(merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
+merged_pvga$compliance_new_ta_2020[merged_pvga$ta_split %in% c("2019","2020") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_2020[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_2020[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
+merged_pvga$compliance_new_ta_2020[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_2020[is.na(merged_pvga$compliance_new_ta_2020)] <- "No supported route"
 
 merged_pvga$compliance_new_ta_2020 <- factor(merged_pvga$compliance_new_ta_2020, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
@@ -548,9 +545,9 @@ compliance_new_ta_2020_a <- merged_pvga %>%
   # Transformative agreements to end of 2021
 merged_pvga$compliance_new_ta_2021 <- NA
 merged_pvga$compliance_new_ta_2021[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
-merged_pvga$compliance_new_ta_2021[(merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020" | merged_pvga$ta_split == "2021") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
-merged_pvga$compliance_new_ta_2021[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020" | merged_pvga$ta_split == "2021") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_2021[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020" | merged_pvga$ta_split == "2021") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
+merged_pvga$compliance_new_ta_2021[merged_pvga$ta_split %in% c("2019","2020","2021") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
+merged_pvga$compliance_new_ta_2021[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020","2021") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
+merged_pvga$compliance_new_ta_2021[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020","2021") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_2021[is.na(merged_pvga$compliance_new_ta_2021)] <- "No supported route"
 
 merged_pvga$compliance_new_ta_2021 <- factor(merged_pvga$compliance_new_ta_2021, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
@@ -564,9 +561,9 @@ compliance_new_ta_2021_a <- merged_pvga %>%
 
 merged_pvga$compliance_new_ta_Elsevier <- NA
 merged_pvga$compliance_new_ta_Elsevier[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
-merged_pvga$compliance_new_ta_Elsevier[(merged_pvga$ta_split == "2016" | merged_pvga$ta_split == "2017" | merged_pvga$ta_split == "2018" | merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020" | merged_pvga$ta_split == "2021" | merged_pvga$ta_split == "Elsevier") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
-merged_pvga$compliance_new_ta_Elsevier[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2016" | merged_pvga$ta_split == "2017" | merged_pvga$ta_split == "2018" | merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020" | merged_pvga$ta_split == "2021" | merged_pvga$ta_split == "Elsevier") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_Elsevier[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2016" | merged_pvga$ta_split == "2017" | merged_pvga$ta_split == "2018" | merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020" | merged_pvga$ta_split == "2021" | merged_pvga$ta_split == "Elsevier") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
+merged_pvga$compliance_new_ta_Elsevier[(merged_pvga$ta_split %in% c("2019","2020","2021") | merged_pvga$Publisher == "Elsevier") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
+merged_pvga$compliance_new_ta_Elsevier[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split %in% c("2019","2020","2021") | merged_pvga$Publisher == "Elsevier") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
+merged_pvga$compliance_new_ta_Elsevier[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split %in% c("2019","2020","2021") | merged_pvga$Publisher == "Elsevier") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_Elsevier[is.na(merged_pvga$compliance_new_ta_Elsevier)] <- "No supported route"
 
 merged_pvga$compliance_new_ta_Elsevier <- factor(merged_pvga$compliance_new_ta_Elsevier, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))

@@ -36,6 +36,9 @@ dimensions <- dimensions %>%
 dimensions <- dimensions %>%
   filter(!(is.na(ISSN) & is.na(e.ISSN) & is.na(Source.title)))
 
+# Save out
+save(dimensions, file = "Data/dimensions_final.Rda")
+
 #XXXXXXXXXXX
 # 2. DOWNLOADING AND PREPARING ESAC DATA----
 
@@ -47,48 +50,53 @@ esac <- xml2::read_html(esac_url)
 esac <- rvest::html_table(esac)[[1]] %>%
   tibble::as_tibble(.name_repair = "unique")
 
+write_csv(esac, file = "Data/Raw data/esac.csv")
+
   # Select only JISC-negotiated deals
-esac <- dplyr::filter(esac, Organization == "Jisc")
+esac_uk <- dplyr::filter(esac, Organization == "Jisc")
 
   # Rename 'publisher' names to match Dimensions data (or else they won't match later on)
 # American Physiological Society is fine
-esac$Publisher <- gsub("Association for Computing Machinery", "Association for Computing Machinery (ACM)", esac$Publisher)
+esac_uk$Publisher <- gsub("Association for Computing Machinery", "Association for Computing Machinery (ACM)", esac_uk$Publisher)
 # Bioscientifica is fine
-esac$Publisher <- gsub("BMJ Publishing", "BMJ", esac$Publisher)
-esac$Publisher <- gsub("Brill", "Brill Academic Publishers", esac$Publisher)
-esac$Publisher <- gsub("Cambridge University Press", "Cambridge University Press (CUP)", esac$Publisher)
-esac$Publisher <- gsub("Cold Spring Harbor Laboratory Press", "Cold Spring Harbor Laboratory", esac$Publisher)
-esac$Publisher <- gsub("Company of Biologists", "The Company of Biologists", esac$Publisher)
-esac$Publisher <- gsub("European Respiratory Society", "European Respiratory Society (ERS)", esac$Publisher)
+esac_uk$Publisher <- gsub("BMJ Publishing", "BMJ", esac_uk$Publisher)
+esac_uk$Publisher <- gsub("Brill", "Brill Academic Publishers", esac_uk$Publisher)
+esac_uk$Publisher <- gsub("Cambridge University Press", "Cambridge University Press (CUP)", esac_uk$Publisher)
+esac_uk$Publisher <- gsub("Cold Spring Harbor Laboratory Press", "Cold Spring Harbor Laboratory", esac_uk$Publisher)
+esac_uk$Publisher <- gsub("Company of Biologists", "The Company of Biologists", esac_uk$Publisher)
+esac_uk$Publisher <- gsub("European Respiratory Society", "European Respiratory Society (ERS)", esac_uk$Publisher)
 # Future Science group is fine
 # IOP Publishing is fine
 # IWA Publishing is fine
-esac$Publisher <- gsub("Karger", "Karger Publishers", esac$Publisher)
+esac_uk$Publisher <- gsub("Karger", "Karger Publishers", esac_uk$Publisher)
 # Microbiology society is fine
-esac$Publisher <- gsub("Oxford University Press", "Oxford University Press (OUP)", esac$Publisher)
+esac_uk$Publisher <- gsub("Oxford University Press", "Oxford University Press (OUP)", esac_uk$Publisher)
 # Portland Press is fine
 # Rockefeller University Press is fine
 # Royal College of General Practitioners is fine
 # Royal Irish academy has 0 articles in our sample
-esac$Publisher <- gsub("Sage", "SAGE Publications", esac$Publisher)
-esac$Publisher <- gsub("Springer Nature", "Springer", esac$Publisher) # this is because I split out Springer and Nature when cleaning Dimensions (since they have different TAs)
-esac$Publisher <- gsub("The Geological Society of London", "Geological Society of London", esac$Publisher)
+esac_uk$Publisher <- gsub("Sage", "SAGE Publications", esac_uk$Publisher)
+esac_uk$Publisher <- gsub("Springer Nature", "Springer", esac_uk$Publisher) # this is because I split out Springer and Nature when cleaning Dimensions (since they have different TAs)
+esac_uk$Publisher <- gsub("The Geological Society of London", "Geological Society of London", esac_uk$Publisher)
 # The Royal Society is fine
 # Thieme is fine
-esac$Publisher <- gsub("Walter de Gruyter", "De Gruyter", esac$Publisher)
+esac_uk$Publisher <- gsub("Walter de Gruyter", "De Gruyter", esac_uk$Publisher)
 # Wiley is fine
 
-# Add confirmed new agreements not yet on ESACC----
-  # ESAC was not updated with these agreements as of 1.04.21 so they need to be added in manually
+# Add confirmed new agreements not yet on esac_ukC----
+  # esac_uk was not updated with these agreements as of 1.04.21 so they need to be added in manually
 temp_ta <- data.frame(c("Taylor & Francis", "BMJ", "Royal Society of Chemistry (RSC)"), "United Kingdom", "JISC", 9999, "09/03/2021", NA, NA)
 names(temp_ta) <- c("Publisher", "Country", "Organization", "Annual publications", "Start date", "End date", "Details/ ID")
-esac <- bind_rows(esac, temp_ta)
+esac_uk <- bind_rows(esac_uk, temp_ta)
 
   # Create new column has_ta = yes. This means that when it is merged into the dimensions data it will highlight all the articles with a publisher with ta.
-esac$has_ta <- "yes"
+esac_uk$has_ta <- "yes"
 
   # Remove duplicates (Karger has two agreements which might create duplicates in the merge)
-esac <- esac[!duplicated(esac$Publisher, incomparables = NA), ]
+esac_uk <- esac_uk[!duplicated(esac_uk$Publisher, incomparables = NA), ]
+
+  # Write to csv
+write_csv(esac_uk, file = "Data/esac_uk.csv")
 
 #XXXXXXXXXXXX
 # 3. PREPARING SHERPA ROMEO DATA----
@@ -265,17 +273,17 @@ sherpa_1row$j_title <- with(sherpa_1row, make.unique(as.character(j_title)))
 
 
 #XXXXXXXXXX
-# 4. LEFT-JOINING ESAC INTO DIMENSIONS MATCHING ON 'PUBLISHER'----
+# 4. LEFT-JOINING esac_uk INTO DIMENSIONS MATCHING ON 'PUBLISHER'----
 
-merged_pvga <- left_join(dimensions, esac[ , c("Publisher", "has_ta")], by = "Publisher")
+merged_pvga <- left_join(dimensions, esac_uk[ , c("Publisher", "has_ta")], by = "Publisher")
 
-merged_pvga$has_ta[is.na(merged_pvga$has_ta)] <- "no" # this couldn't be created before the merge (i.e. it's highlighting which rows were not merged with esac entries with TAs)
+merged_pvga$has_ta[is.na(merged_pvga$has_ta)] <- "no" # this couldn't be created before the merge (i.e. it's highlighting which rows were not merged with esac_uk entries with TAs)
 
 # TEST tO CHECK IF TAs UP TO DATE
-ta_test <- merged_pvga %>% filter(!duplicated(Publisher), has_ta == "yes") # number of observations should be the same as the number of observations in ESAC (assuming every publisher has at least one article in our sample) - if it is lower it means a new publisher has been added to ESAC and that publisher has a different name in Dimensions.
+ta_test <- merged_pvga %>% filter(!duplicated(Publisher), has_ta == "yes") # number of observations should be the same as the number of observations in esac_uk (assuming every publisher has at least one article in our sample) - if it is lower it means a new publisher has been added to esac_uk and that publisher has a different name in Dimensions.
 
 #XXXXXXXXXXXX
-# 5. LEFT-JOINING SHERPA INTO MERGED DIMENSIONS-ESAC----
+# 5. LEFT-JOINING SHERPA INTO MERGED DIMENSIONS-esac_uk----
 
 # Select rows to keep from sherpa
 sherpa_keep_rows <- c("issn_print", "issn_electronic", "j_title", "sherpa_id", "listed_in_doaj", "sherpa_publisher", "system_metadata.uri", "open_access_prohibited", "g_article_version", "g_license", "g_license1", "g_license2", "g_license3", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo2", "g_embargo3", "g_compliant_repository", "g_copyright", "rank_green", "fee_article_version", "fee_license", "fee_license1", "fee_license2", "fee_license3", "fee_copyright_owner", "fee_conditions", "fee_copyright", "rank_fee")
