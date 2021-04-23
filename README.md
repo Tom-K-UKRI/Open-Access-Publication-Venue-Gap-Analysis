@@ -9,9 +9,9 @@ The workflow used to generate the merged publication venue gap analysis data.
 
 # Setting up the project folder
 The first step was/ is to create an RStudio project file (see blog on this here https://martinctc.github.io/blog/rstudio-projects-and-working-directories-a-beginner's-guide/), along with subfolders for 
-  o	‘Data’ = this is where all the data will be stored, it should also contain a subfolder called ‘Raw data’
-  o	‘Outputs’ = this is where all the tables and charts will go
-  o	‘Scripts’ = this is where all the code goes
+- ‘Data’ = this is where all the data will be stored, it should also contain a subfolder called ‘Raw data’
+- ‘Outputs’ = this is where all the tables and charts will go
+- ‘Scripts’ = this is where all the code goes
   
 # Data Scripts
 The first three scripts download and clean the data ready for analysis in the fourth script. These scripts were last run on the week commencing 29th March 2021, with the final merged dataset then uploaded to the DataHub

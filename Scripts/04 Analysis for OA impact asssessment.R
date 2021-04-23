@@ -158,7 +158,7 @@ write.xlsx(why_unsupported, file = "Output/Tables/why unsupported by new policy.
 
 Open.Access_a <- merged_pvga %>% # article level
   count(Open.Access2) %>%
-  mutate(percent = round(n / sum(n) * 100),1) %>%
+  mutate(percent = round(n / sum(n) * 100,1)) %>%
   adorn_totals("row")
 
 openxlsx::write.xlsx(as.data.frame(Open.Access_a), 'Output/Tables/Open.Access.xlsx')
@@ -175,7 +175,7 @@ Open.Access_a_disc <- disciplines %>%
   group_by(disc) %>%
   count(Open.Access2, .drop = FALSE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
-  mutate(cml = round(cumsum(percent),1)) %>%
+  mutate(cml = round(cumsum(percent,1))) %>%
   mutate(percent = round(percent, 1)) %>%
   mutate(disc = factor(disc, ordered = TRUE, levels = c("Arts & Humanities", "Health Sciences", "Life Sciences", "Physical Sciences", "Social Sciences", "Missing")), 
          Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
@@ -235,7 +235,7 @@ compliance_new_ukri_funder_ta <- bind_cols(compliance_new_ukri_funder, TA_ukri_f
 # Add all articles row (this feels very elaborate but I couldn't think of a simpler way to do it)
 compliance_all_articles <- as.data.frame(t(merged_pvga %>%
                                              count(compliance_new) %>%
-                                             mutate(percent = round(n/sum(n)*100),1))) %>%
+                                             mutate(percent = round(n/sum(n)*100,1)))) %>%
   mutate(total_n = nrow(merged_pvga)) %>%
   slice(3)
 
@@ -244,7 +244,7 @@ compliance_all_articles <- compliance_all_articles %>%
   mutate(total_supported = sum(across(1:3))) %>%
   relocate(7)
 
-ta_all_hybrid <- merged_pvga %>% filter(journal_type == "Hybrid") %>% count(has_ta) %>% mutate(percent_hybrid_with_TA = round(n/sum(n)*100),1) %>% filter(has_ta == "yes")
+ta_all_hybrid <- merged_pvga %>% filter(journal_type == "Hybrid") %>% count(has_ta) %>% mutate(percent_hybrid_with_TA = round(n/sum(n)*100,1)) %>% filter(has_ta == "yes")
 
 compliance_ta_all_articles <- bind_cols(compliance_all_articles, ta_all_hybrid) %>%
   select(-c(8,9,11))
@@ -284,7 +284,7 @@ TA_disc <- disciplines %>%
   filter(!is.na(disc), journal_type == "Hybrid") %>%
   group_by(disc) %>%
   count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100),1) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
   filter(has_ta == "yes")
 
     # Merge in with compliance_new_disc to add TA column
@@ -357,7 +357,7 @@ TA_div <- divisions %>%
   filter(!is.na(division), journal_type == "Hybrid") %>%
   group_by(division) %>%
   count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100),1) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
   filter(has_ta == "yes")
 
   # Merge in with compliance_new_division
@@ -398,7 +398,7 @@ TA_group <- groups %>%
   filter(!is.na(group), journal_type == "Hybrid") %>%
   group_by(group) %>%
   count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100),1) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
   filter(has_ta == "yes")
 
 # Merge in with compliance_new_group
@@ -436,12 +436,11 @@ openxlsx::write.xlsx(as.data.frame(top_publishers_oac), 'Output/Tables/top_publi
 
 # Non-compliant by publisher
 
-not_compliance_new_publisher <- merged_pvga %>%
+not_compliance_new_publisher <- merged_pvga_elsevierta %>%
   filter(compliance_new2 == "not compliant") %>%
   count(Publisher, sort = TRUE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
-  mutate(cml = round(cumsum(percent),0)) %>%
-  mutate(percent = round(percent, 0)) %>%
+  mutate(cml = cumsum(percent)) %>%
   adorn_totals("row")
 # add in total articles per publisher
 articles_per_publisher <- merged_pvga %>%
@@ -450,7 +449,7 @@ articles_per_publisher <- merged_pvga %>%
 not_compliance_new_publisher <- left_join(not_compliance_new_publisher, articles_per_publisher, by = "Publisher") %>%
   mutate(percent_of_publisher_total = round(n.x / n.y * 100,1)) %>%
   select(-5)
-openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher), 'Output/Tables/not_compliant_new_publisher.xlsx')
+openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher), 'Output/Tables/not_compliant_new_publisher_target_tas.xlsx')
 
 # Publisher by discipline
 disciplines <- merged_pvga %>% 

@@ -283,7 +283,7 @@ merged_pvga$has_ta[is.na(merged_pvga$has_ta)] <- "no" # this couldn't be created
 ta_test <- merged_pvga %>% filter(!duplicated(Publisher), has_ta == "yes") # number of observations should be the same as the number of observations in esac_uk (assuming every publisher has at least one article in our sample) - if it is lower it means a new publisher has been added to esac_uk and that publisher has a different name in Dimensions.
 
 #XXXXXXXXXXXX
-# 5. LEFT-JOINING SHERPA INTO MERGED DIMENSIONS-esac_uk----
+# 5. INNER-JOINING SHERPA INTO MERGED DIMENSIONS-esac_uk----
 
 # Select rows to keep from sherpa
 sherpa_keep_rows <- c("issn_print", "issn_electronic", "j_title", "sherpa_id", "listed_in_doaj", "sherpa_publisher", "system_metadata.uri", "open_access_prohibited", "g_article_version", "g_license", "g_license1", "g_license2", "g_license3", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo2", "g_embargo3", "g_compliant_repository", "g_copyright", "rank_green", "fee_article_version", "fee_license", "fee_license1", "fee_license2", "fee_license3", "fee_copyright_owner", "fee_conditions", "fee_copyright", "rank_fee")
