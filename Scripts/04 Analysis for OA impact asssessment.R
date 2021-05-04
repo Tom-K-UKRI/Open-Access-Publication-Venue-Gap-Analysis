@@ -107,37 +107,36 @@ policy_impact_a <- bind_rows(Open.Access_a, compliance_current_a, compliance_h_a
   relocate(5,1,2,3,4)
 
   # Label each scenario and compliance route
-policy_impact_a[5:9,'Scenario'] <- "Current\n(potential)"
-policy_impact_a[10:14,'Scenario'] <- "S1"
-policy_impact_a[15:19,'Scenario'] <- "S2"
-policy_impact_a[20:23,'Scenario'] <- "S3"
-policy_impact_a[c(1,5,10,15,20), 'Compliance_Route'] <- "Full gold OA"
-policy_impact_a[c(2,6,11,16), 'Compliance_Route'] <- "Hybrid gold\n(with TA for S2)"
-policy_impact_a[c(3,7,12,17,21), 'Compliance_Route'] <- "Confirmed green OA"
-policy_impact_a[c(8,13,18,22), 'Compliance_Route'] <- "Unconfirmed green OA"
-policy_impact_a[c(4,9,14,19,23), 'Compliance_Route'] <- "No potential supported\nroute to open access"
+policy_impact_a[5:8,'Scenario'] <- "Current\n(potential)"
+policy_impact_a[9:12,'Scenario'] <- "S1"
+policy_impact_a[13:16,'Scenario'] <- "S2"
+policy_impact_a[17:19,'Scenario'] <- "S3"
+policy_impact_a[c(1,5,9,13,17), 'Compliance_Route'] <- "Full gold OA"
+policy_impact_a[c(2,6,10,14), 'Compliance_Route'] <- "Hybrid gold\n(with TA for S2)"
+policy_impact_a[c(3,7,11,15,18), 'Compliance_Route'] <- "Confirmed green OA"
+policy_impact_a[c(4,8,12,16,19), 'Compliance_Route'] <- "No confirmed supported\nroute to open access"
 
-policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c("Full gold OA", "Hybrid gold\n(with TA for S2)", "Confirmed green OA", "Unconfirmed green OA", "No potential supported\nroute to open access")) # this is needed so they appear in order in table/chart
+policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c("Full gold OA", "Hybrid gold\n(with TA for S2)", "Confirmed green OA", "No confirmed supported\nroute to open access")) # this is needed so they appear in order in table/chart
 
 # Create stacked bar chart for articles
 
 policy_impact_a_bar <- ggplot(policy_impact_a, aes(fill=Compliance_Route, y=percent, x=Scenario)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#99d8c9", "#FF5A5A"), name = "Route to Open Access") +
-  # ggtitle("Impact of each policy scenario (articles)") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Open Access") +
+  # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
         axis.text.x  = element_text(vjust=0.5, size=14),
         title =  element_text(face="bold", size=16),
         legend.text = element_text(size=14)) +
   labs(x="Policy Scenarios", y= "% of articles")
 
-ggsave(policy_impact_a_bar, filename = "Output/Charts/Impact of each policy scenario (articles).png")
+ggsave(policy_impact_a_bar, filename = "Output/Charts/Impact of each policy scenario (articles).png",  width = 8, height = 5, dpi = 300)
 
 # Create summary table to compare scenarios - subset percentages only and
 policy_impact_a_summary <- policy_impact_a %>%
   select(-c(n, cml)) %>%
   pivot_wider(names_from = Scenario, values_from = percent) %>%
-  arrange(factor(Compliance_Route, levels = c("Full gold OA", "Hybrid gold\n(with TA for S2)", "Confirmed green OA", "Unconfirmed green OA", "No potential supported\nroute to open access")))
+  arrange(factor(Compliance_Route, levels = c("Full gold OA", "Hybrid gold\n(with TA for S2)", "Confirmed green OA", "No confirmed supported\nroute to open access")))
 
 policy_impact_a_summary[is.na(policy_impact_a_summary)] <- 0
 
@@ -216,8 +215,8 @@ compliance_new_ukri_funder <- ukri_funders  %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
   rename(total_n = "total_n_c: pure gold") %>%
-  select(-c(8,9,10,11)) %>%
-  relocate(1,8)
+  select(-c(9,8,7)) %>%
+  relocate(1,7)
 
 # Add column to show proportion of each division covered by TA
 TA_ukri_funder <- ukri_funders %>%
@@ -229,7 +228,7 @@ TA_ukri_funder <- ukri_funders %>%
 
 # Merge in with compliance_new_ukri_funder to add TA column
 compliance_new_ukri_funder_ta <- bind_cols(compliance_new_ukri_funder, TA_ukri_funder) %>%
-  select(-c(9,10,11)) %>%
+  select(-c(8,9,10)) %>%
   rename(percent_hybrid_with_TA = percent)
 
 # Add all articles row (this feels very elaborate but I couldn't think of a simpler way to do it)
@@ -242,14 +241,14 @@ compliance_all_articles <- as.data.frame(t(merged_pvga %>%
 compliance_all_articles <- as.data.frame(lapply(compliance_all_articles,as.numeric))
 compliance_all_articles <- compliance_all_articles %>%
   mutate(total_supported = sum(across(1:3))) %>%
-  relocate(7)
+  relocate(6)
 
 ta_all_hybrid <- merged_pvga %>% filter(journal_type == "Hybrid") %>% count(has_ta) %>% mutate(percent_hybrid_with_TA = round(n/sum(n)*100,1)) %>% filter(has_ta == "yes")
 
 compliance_ta_all_articles <- bind_cols(compliance_all_articles, ta_all_hybrid) %>%
-  select(-c(8,9,11))
+  select(-c(7,8))
 
-colnames(compliance_ta_all_articles) <- colnames(compliance_new_ukri_funder_ta[2:9])
+colnames(compliance_ta_all_articles) <- colnames(compliance_new_ukri_funder_ta[2:8])
 
 # Merge in with compliance_new_ukri_funder_ta to create final table
 compliance_new_ukri_funder_ta <- bind_rows(compliance_new_ukri_funder_ta, compliance_ta_all_articles)
@@ -274,8 +273,8 @@ compliance_new_disc <- disciplines %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
   rename(total_n = "total_n_c: pure gold") %>%
-  select(-c(8,9,10,11)) %>%
-  relocate(1,8)
+  select(-c(7,8,9,10)) %>%
+  relocate(1,6)
 
 compliance_new_disc$disc[is.na(compliance_new_disc$disc)] <- "Missing"
 
@@ -289,7 +288,7 @@ TA_disc <- disciplines %>%
 
     # Merge in with compliance_new_disc to add TA column
 compliance_new_disc_ta <- bind_cols(compliance_new_disc, TA_disc) %>%
-  select(-c(9,10,11,13)) %>%
+  select(-c(7,8,9)) %>%
   rename(percent_hybrid_with_TA = percent)
   
 # Merge in with compliance_new_disc_ta to create final table
@@ -305,19 +304,18 @@ compliance_new_disc_a <- disciplines %>%
   count(compliance_new, .drop = FALSE) %>%
   mutate(percent = round(n/sum(n)*100,1))
 
-compliance_new_disc_a$disc[1:5] <- "Arts &\nHumanities"
-compliance_new_disc_a$disc[6:10] <- "Health\nSciences"
-compliance_new_disc_a$disc[11:15] <- "Life\nSciences"
-compliance_new_disc_a$disc[16:20] <- "Missing"
-compliance_new_disc_a$disc[21:25] <- "Physical\nSciences"
-compliance_new_disc_a$disc[26:30] <- "Social\nSciences"
+compliance_new_disc_a$disc[1:4] <- "Arts &\nHumanities"
+compliance_new_disc_a$disc[5:8] <- "Health\nSciences"
+compliance_new_disc_a$disc[9:12] <- "Life\nSciences"
+compliance_new_disc_a$disc[13:16] <- "Missing"
+compliance_new_disc_a$disc[17:20] <- "Physical\nSciences"
+compliance_new_disc_a$disc[21:24] <- "Social\nSciences"
 
 compliance_new_disc_a$disc <- factor(compliance_new_disc_a$disc, ordered = TRUE, c("Arts &\nHumanities", "Health\nSciences", "Life\nSciences", "Physical\nSciences", "Social\nSciences", "Missing"))
 
 compliance_new_disc_chart <- ggplot(compliance_new_disc_a, aes(fill=compliance_new, y = percent, x = disc)) +
   geom_bar(position = "stack", stat = "identity", width = 0.9) +
-  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#99d8c9", "#FF5A5A"), name = "Route to Compliance") +
-  # ggtitle("Compliance by Discipline in S2") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
         axis.text.x  = element_text(vjust=0.5, size=12),
@@ -325,7 +323,7 @@ compliance_new_disc_chart <- ggplot(compliance_new_disc_a, aes(fill=compliance_n
         legend.text = element_text(size=14)) +
   labs(x="Discipline", y= "% of articles")
 
-ggsave(compliance_new_disc_chart, filename = "Output/Charts/compliance_new_disc_chart.png")
+ggsave(compliance_new_disc_chart, filename = "Output/Charts/compliance_new_disc_chart.png", width = 8, height = 5, dpi = 300)
 
 
 
@@ -346,8 +344,8 @@ compliance_new_division <- divisions %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
   rename(total_n = "total_n_c: pure gold") %>%
-  select(-c(8,9,10,11)) %>%
-  relocate(1,8)
+  select(-c(7,8,9)) %>%
+  relocate(1,7)
 
 compliance_new_division$division[is.na(compliance_new_division$division)] <- "Missing"
 
@@ -362,7 +360,7 @@ TA_div <- divisions %>%
 
   # Merge in with compliance_new_division
 compliance_new_division_ta <- bind_cols(compliance_new_division, TA_div) %>%
-  select(-c(9,10,11,13)) %>%
+  select(-c(8,9,10)) %>%
   rename(percent_hybrid_with_TA = percent)
 
 # Merge in with all articles row to create final table
@@ -387,8 +385,8 @@ compliance_new_group <- groups %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
   rename(total_n = "total_n_c: pure gold") %>%
-  select(-c(8,9,10,11)) %>%
-  relocate(1,8)
+  select(-c(7,8,9)) %>%
+  relocate(1,7)
 
 compliance_new_group$group[is.na(compliance_new_group$group)] <- "Missing"
 
@@ -403,7 +401,7 @@ TA_group <- groups %>%
 
 # Merge in with compliance_new_group
 compliance_new_group_ta <- bind_cols(compliance_new_group, TA_group) %>%
-  select(-c(9,10,11,13)) %>%
+  select(-c(8,9,10)) %>%
   rename(percent_hybrid_with_TA =percent)
 
 # Merge in with all articles row to create final table
@@ -436,7 +434,7 @@ openxlsx::write.xlsx(as.data.frame(top_publishers_oac), 'Output/Tables/top_publi
 
 # Non-compliant by publisher
 
-not_compliance_new_publisher <- merged_pvga_elsevierta %>%
+not_compliance_new_publisher <- merged_pvga %>%
   filter(compliance_new2 == "not compliant") %>%
   count(Publisher, sort = TRUE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
@@ -449,7 +447,7 @@ articles_per_publisher <- merged_pvga %>%
 not_compliance_new_publisher <- left_join(not_compliance_new_publisher, articles_per_publisher, by = "Publisher") %>%
   mutate(percent_of_publisher_total = round(n.x / n.y * 100,1)) %>%
   select(-5)
-openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher), 'Output/Tables/not_compliant_new_publisher_target_tas.xlsx')
+openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher), 'Output/Tables/not_compliant_new_publisher.xlsx')
 
 # Publisher by discipline
 disciplines <- merged_pvga %>% 
@@ -502,10 +500,9 @@ merged_pvga$compliance_new_ta_noTA <- NA
 merged_pvga$compliance_new_ta_noTA[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_ta_noTA[merged_pvga$ta_split == "noTA" & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_noTA[!merged_pvga$num_fee %in% c(1,4) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_noTA[!merged_pvga$num_fee %in% c(1,4) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_noTA[is.na(merged_pvga$compliance_new_ta_noTA)] <- "No supported route"
 
-merged_pvga$compliance_new_ta_noTA <- factor(merged_pvga$compliance_new_ta_noTA, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
+merged_pvga$compliance_new_ta_noTA <- factor(merged_pvga$compliance_new_ta_noTA, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
 
 compliance_new_ta_noTA_a <- merged_pvga %>%
   count(compliance_new_ta_noTA, .drop = FALSE) %>%
@@ -516,10 +513,9 @@ merged_pvga$compliance_new_ta_2019 <- NA
 merged_pvga$compliance_new_ta_2019[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_ta_2019[merged_pvga$ta_split == "2019" & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_2019[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split == "2019" & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_2019[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split == "2019" & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_2019[is.na(merged_pvga$compliance_new_ta_2019)] <- "No supported route"
 
-merged_pvga$compliance_new_ta_2019 <- factor(merged_pvga$compliance_new_ta_2019, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
+merged_pvga$compliance_new_ta_2019 <- factor(merged_pvga$compliance_new_ta_2019, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
 
 compliance_new_ta_2019_a <- merged_pvga %>%
   count(compliance_new_ta_2019, .drop = FALSE) %>%
@@ -531,10 +527,9 @@ merged_pvga$compliance_new_ta_2020 <- NA
 merged_pvga$compliance_new_ta_2020[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_ta_2020[merged_pvga$ta_split %in% c("2019","2020") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_2020[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split == "2019" | merged_pvga$ta_split == "2020") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_2020[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_2020[is.na(merged_pvga$compliance_new_ta_2020)] <- "No supported route"
 
-merged_pvga$compliance_new_ta_2020 <- factor(merged_pvga$compliance_new_ta_2020, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
+merged_pvga$compliance_new_ta_2020 <- factor(merged_pvga$compliance_new_ta_2020, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
 
 compliance_new_ta_2020_a <- merged_pvga %>%
   count(compliance_new_ta_2020, .drop = FALSE) %>%
@@ -546,10 +541,9 @@ merged_pvga$compliance_new_ta_2021 <- NA
 merged_pvga$compliance_new_ta_2021[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_ta_2021[merged_pvga$ta_split %in% c("2019","2020","2021") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_2021[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020","2021") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_2021[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020","2021") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_2021[is.na(merged_pvga$compliance_new_ta_2021)] <- "No supported route"
 
-merged_pvga$compliance_new_ta_2021 <- factor(merged_pvga$compliance_new_ta_2021, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
+merged_pvga$compliance_new_ta_2021 <- factor(merged_pvga$compliance_new_ta_2021, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
 
 compliance_new_ta_2021_a <- merged_pvga %>%
   count(compliance_new_ta_2021, .drop = FALSE) %>%
@@ -562,10 +556,9 @@ merged_pvga$compliance_new_ta_Elsevier <- NA
 merged_pvga$compliance_new_ta_Elsevier[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_ta_Elsevier[(merged_pvga$ta_split %in% c("2019","2020","2021") | merged_pvga$Publisher == "Elsevier") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_Elsevier[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split %in% c("2019","2020","2021") | merged_pvga$Publisher == "Elsevier") & merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_Elsevier[!merged_pvga$num_fee %in% c(1,4) & !((merged_pvga$ta_split %in% c("2019","2020","2021") | merged_pvga$Publisher == "Elsevier") & merged_pvga$num_fee %in% c(2,5)) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_Elsevier[is.na(merged_pvga$compliance_new_ta_Elsevier)] <- "No supported route"
 
-merged_pvga$compliance_new_ta_Elsevier <- factor(merged_pvga$compliance_new_ta_Elsevier, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
+merged_pvga$compliance_new_ta_Elsevier <- factor(merged_pvga$compliance_new_ta_Elsevier, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
 
 compliance_new_ta_Elsevier_a <- merged_pvga %>%
   count(compliance_new_ta_Elsevier, .drop = FALSE) %>%
@@ -577,10 +570,9 @@ merged_pvga$compliance_new_ta_100 <- NA
 merged_pvga$compliance_new_ta_100[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
 merged_pvga$compliance_new_ta_100[merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
 merged_pvga$compliance_new_ta_100[!merged_pvga$num_fee %in% c(1,4) & !merged_pvga$num_fee %in% c(2,4) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
-merged_pvga$compliance_new_ta_100[!merged_pvga$num_fee %in% c(1,4) & !merged_pvga$num_fee %in% c(2,4) & !merged_pvga$num_new_green %in% c(1,3) & (merged_pvga$g_embargo == 0 & merged_pvga$g_license1 == "no license requirement")] <- "nc: unconfirmed green oa"
 merged_pvga$compliance_new_ta_100[is.na(merged_pvga$compliance_new_ta_100)] <- "No supported route"
 
-merged_pvga$compliance_new_ta_100 <- factor(merged_pvga$compliance_new_ta_100, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "nc: unconfirmed green oa", "No supported route"))
+merged_pvga$compliance_new_ta_100 <- factor(merged_pvga$compliance_new_ta_100, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
 
 compliance_new_ta_100_a <- merged_pvga %>%
   count(compliance_new_ta_100, .drop = FALSE) %>%
@@ -592,18 +584,17 @@ ta_impact_a <- bind_rows(compliance_new_ta_noTA_a, compliance_new_ta_2019_a, com
   unite(Compliance_Route, c('compliance_new_ta_noTA', 'compliance_new_ta_2019', 'compliance_new_ta_2020', 'compliance_new_ta_2021', 'compliance_new_ta_Elsevier', 'compliance_new_ta_100'), na.rm = TRUE) %>%
   relocate(5,1,2,3,4)
 
-ta_impact_a[6:10,'ta_coverage'] <- "TAs by\n2019"
-ta_impact_a[11:15,'ta_coverage'] <- "TAs by\n2020"
-ta_impact_a[16:20,'ta_coverage'] <- "TAs by\n2021"
-ta_impact_a[21:25,'ta_coverage'] <- "+ Elsevier\nTA"
-ta_impact_a[26:30,'ta_coverage'] <- "Full TA\ncoverage"
-ta_impact_a[c(1,6,11,16,21,26), 'Compliance_Route'] <- "Pure gold"
-ta_impact_a[c(2,7,12,17,22,27), 'Compliance_Route'] <- "Hybrid gold with TA"
-ta_impact_a[c(3,8,13,18,23,28), 'Compliance_Route'] <- "Confirmed green OA"
-ta_impact_a[c(4,9,14,19,24,29), 'Compliance_Route'] <- "Unconfirmed green OA"
-ta_impact_a[c(5,10,15,20,25,30), 'Compliance_Route'] <- "No supported route"
+ta_impact_a[5:8,'ta_coverage'] <- "TAs by\n2019"
+ta_impact_a[9:12,'ta_coverage'] <- "TAs by\n2020"
+ta_impact_a[13:16,'ta_coverage'] <- "TAs by\n2021"
+ta_impact_a[17:20,'ta_coverage'] <- "+ Elsevier\nTA"
+ta_impact_a[21:24,'ta_coverage'] <- "Full TA\ncoverage"
+ta_impact_a[c(1,5,9,13,17,21), 'Compliance_Route'] <- "Pure gold"
+ta_impact_a[c(2,6,10,14,18,22), 'Compliance_Route'] <- "Hybrid gold with TA"
+ta_impact_a[c(3,7,11,15,19,23), 'Compliance_Route'] <- "Confirmed green OA"
+ta_impact_a[c(4,8,12,16,20,24), 'Compliance_Route'] <- "No confirmed supported route"
 
-ta_impact_a$Compliance_Route <- factor(ta_impact_a$Compliance_Route, ordered = TRUE, levels = c("Pure gold", "Hybrid gold with TA", "Confirmed green OA", "Unconfirmed green OA", "No supported route"))
+ta_impact_a$Compliance_Route <- factor(ta_impact_a$Compliance_Route, ordered = TRUE, levels = c("Pure gold", "Hybrid gold with TA", "Confirmed green OA", "No confirmed supported route"))
 ta_impact_a$ta_coverage <- factor(ta_impact_a$ta_coverage, ordered = TRUE, levels = c("No TAs", "TAs by\n2019", "TAs by\n2020", "TAs by\n2021", "+ Elsevier\nTA", "Full TA\ncoverage"))
 
 openxlsx::write.xlsx(as.data.frame(ta_impact_a), 'Output/Tables/ta_impact_a.xlsx')
@@ -612,11 +603,11 @@ openxlsx::write.xlsx(as.data.frame(ta_impact_a), 'Output/Tables/ta_impact_a.xlsx
 
 ta_impact_a_bar <- ggplot(ta_impact_a, aes(fill=Compliance_Route, y=percent, x=ta_coverage)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#99d8c9", "#FF5A5A"), name = "Route to Compliance") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
   theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
         axis.text.x  = element_text(vjust=0.5, size=14, angle = 90),
         axis.title.y = element_text(face="bold", size=14, margin = margin(t=10)),
         legend.text = element_text(size=14)) +
   labs(x="Introduction of new TAs", y= "% of articles")
 
-ggsave(ta_impact_a_bar, filename = "Output/Charts/ta_impact_a_bar.png")
+ggsave(ta_impact_a_bar, filename = "Output/Charts/ta_impact_a_bar.png", width = 8, height = 5, dpi = 300)

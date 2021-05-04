@@ -99,7 +99,7 @@ dimensions$for_group[is.na(dimensions$for_group)] <- "No FOR group recorded"
 
 physical_sciences <- c("01 Mathematical Sciences", "02 Physical Sciences", "03 Chemical Sciences", "04 Earth Sciences", "05 Environmental Sciences", "08 Information and Computing Sciences", "09 Engineering", "10 Technology", "12 Built Environment and Design")
 health_sciences <- c("11 Medical and Health Sciences")
-social_sciences <- c("13 Education", "14 Economics", "15 Commerce, Management, Tourism, and Services", "16 Studies in Human Society", "17 Psychology and Cognitive Sciences", "18 Law and Legal Sciences")
+social_sciences <- c("13 Education", "14 Economics", "15 Commerce, Management, Tourism and Services", "16 Studies in Human Society", "17 Psychology and Cognitive Sciences", "18 Law and Legal Studies")
 life_sciences <- c("06 Biological Sciences", "07 Agricultural and Veterinary Sciences")
 arts_humanities <- c("19 Studies in Creative Arts and Writing", "20 Language, Communication and Culture", "21 History and Archaeology", "22 Philosophy and Religious Studies")
 
