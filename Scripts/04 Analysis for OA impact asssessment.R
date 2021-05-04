@@ -174,7 +174,7 @@ Open.Access_a_disc <- disciplines %>%
   group_by(disc) %>%
   count(Open.Access2, .drop = FALSE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
-  mutate(cml = round(cumsum(percent,1))) %>%
+  mutate(cml = round(cumsum(percent),1)) %>%
   mutate(percent = round(percent, 1)) %>%
   mutate(disc = factor(disc, ordered = TRUE, levels = c("Arts & Humanities", "Health Sciences", "Life Sciences", "Physical Sciences", "Social Sciences", "Missing")), 
          Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
