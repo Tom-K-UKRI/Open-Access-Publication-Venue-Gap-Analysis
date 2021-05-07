@@ -12,14 +12,13 @@ rm(list=ls())
 library(tidyverse)
 library(openxlsx)
 library(janitor)
-library(knitr)
+# library(knitr)
 library(ggplot2)
-library(psych)
+# library(psych)
 
 #XXXXXXXXX
 # Import data
 load("Data/merged_pvga.Rda")
-
 
 ####
 
@@ -111,18 +110,22 @@ policy_impact_a[5:8,'Scenario'] <- "Current\n(potential)"
 policy_impact_a[9:12,'Scenario'] <- "S1"
 policy_impact_a[13:16,'Scenario'] <- "S2"
 policy_impact_a[17:19,'Scenario'] <- "S3"
-policy_impact_a[c(1,5,9,13,17), 'Compliance_Route'] <- "Full gold OA"
-policy_impact_a[c(2,6,10,14), 'Compliance_Route'] <- "Hybrid gold\n(with TA for S2)"
-policy_impact_a[c(3,7,11,15,18), 'Compliance_Route'] <- "Confirmed green OA"
-policy_impact_a[c(4,8,12,16,19), 'Compliance_Route'] <- "No confirmed supported\nroute to open access"
+policy_impact_a[c(1,5,9,13,17), 'Compliance_Route'] <- "Gold OA in\nfully oa journal\n"
+policy_impact_a[c(2,6,10,14), 'Compliance_Route'] <- "Gold OA in\nHybrid gold journal\n(with TAs for S2)"
+policy_impact_a[c(3,7,11,15,18), 'Compliance_Route'] <- "\nConfirmed green OA\n"
+policy_impact_a[c(4,8,12,16,19), 'Compliance_Route'] <- "None identified under\ncurrent journal policies\n"
 
-policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c("Full gold OA", "Hybrid gold\n(with TA for S2)", "Confirmed green OA", "No confirmed supported\nroute to open access")) # this is needed so they appear in order in table/chart
+policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c(
+  "Gold OA in\nfully oa journal\n", 
+  "Gold OA in\nHybrid gold journal\n(with TAs for S2)", 
+  "\nConfirmed green OA\n", 
+  "None identified under\ncurrent journal policies\n")) # this is needed so they appear in order in table/chart
 
 # Create stacked bar chart for articles
 
 policy_impact_a_bar <- ggplot(policy_impact_a, aes(fill=Compliance_Route, y=percent, x=Scenario)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Open Access") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Routes to Open Access\nsupported by each\npolicy scenario", labels = c("Gold OA in\nfully OA journal\n", "Gold OA in Hybrid journal\n(with Transitional Agreement\nfor S2)", "\nConfirmed green OA\n", "None identified under\ncurrent journal policies\n")) +
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
         axis.text.x  = element_text(vjust=0.5, size=14),
@@ -186,16 +189,18 @@ openxlsx::write.xlsx(as.data.frame(Open.Access_a_disc), 'Output/Tables/Open.Acce
 Open.Access_a_disc_bar <- Open.Access_a_disc %>%
   ggplot(aes(x=disc, y=percent)) +
   geom_bar(aes(fill=Open.Access2), stat = "identity", position = "stack", width = 0.9) +
-  scale_fill_manual(values = c("#F08900","#FBBB10", "#16978A","#FF5A5A")) +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Open Access Category", labels = c("Gold OA in fully\nOA journal\n", "Gold OA in Hybrid\njournal\n", "Green OA (Version\nof Record or Author\nAccepted Manuscript", "\nNo OA version identified\n")) +
   # ggtitle("Open Access Categories by discipline") +
-  theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
-        axis.text.x  = element_text(vjust=0.5, size=12),
+  theme(axis.title.x = element_text(face="bold", size=16, margin = margin(t=10)),
+        axis.text.x  = element_text(vjust=0.5, size=14),
+        axis.title.y = element_text(face="bold", size=16, margin = margin(t=10)),
+        axis.text.y  = element_text(vjust=0.5, size=14),
         title =  element_text(face="bold", size=16),
         legend.text = element_text(size=14)) +
   labs(x="Disciplines", y= "% of all articles in panel", fill = "Open access") +
   scale_x_discrete(labels = c("Arts &\nHumanities", "Health\nSciences","Life\nSciences", "Physical\nSciences", "Social\nSciences", "Missing"))
 
-ggsave(Open.Access_a_disc_bar, filename = "Output/Charts/Open.Access_a_disc_bar.png")
+ggsave(Open.Access_a_disc_bar, filename = "Output/Charts/Open.Access_a_disc_bar.png", width = 9, height = 5, dpi = 300)
 
 
 # VARIATION OF POLICY IMPACT BY GROUP----
@@ -315,8 +320,9 @@ compliance_new_disc_a$disc <- factor(compliance_new_disc_a$disc, ordered = TRUE,
 
 compliance_new_disc_chart <- ggplot(compliance_new_disc_a, aes(fill=compliance_new, y = percent, x = disc)) +
   geom_bar(position = "stack", stat = "identity", width = 0.9) +
-  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Supported routes to\nOpen Access", labels = c("Gold OA in\nfully OA journal\n", "Gold OA in Hybrid\njournal with\nTransitional Agreement", "\nConfirmed green OA\n", "None identified under\ncurrent journal policies\n")) +
   scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  # scale_fill_discrete(name = "Supported routes to\nOpen Access", labels = c("Gold OA in\nfully OA journal\n", "Gold OA in Hybrid\n journal with TA", "Confirmed green OA", "None identified under\ncurrent journal policies")) +
   theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
         axis.text.x  = element_text(vjust=0.5, size=12),
         title =  element_text(face="bold", size=16),
@@ -603,11 +609,12 @@ openxlsx::write.xlsx(as.data.frame(ta_impact_a), 'Output/Tables/ta_impact_a.xlsx
 
 ta_impact_a_bar <- ggplot(ta_impact_a, aes(fill=Compliance_Route, y=percent, x=ta_coverage)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Route to Compliance") +
+  scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Supported routes to\nOpen Access", labels = c("Gold OA in\nfully OA journal\n", "Gold OA in Hybrid\njournal with\nTransitional Agreement", "\nConfirmed green OA\n", "None identified under\ncurrent journal policies\n")) +
   theme(axis.title.x = element_text(face="bold", size=14, margin = margin(t=10)),
         axis.text.x  = element_text(vjust=0.5, size=14, angle = 90),
         axis.title.y = element_text(face="bold", size=14, margin = margin(t=10)),
-        legend.text = element_text(size=14)) +
+        legend.text = element_text(size=14),
+        legend.title = element_text(size=16, face="bold")) +
   labs(x="Introduction of new TAs", y= "% of articles")
 
 ggsave(ta_impact_a_bar, filename = "Output/Charts/ta_impact_a_bar.png", width = 8, height = 5, dpi = 300)
