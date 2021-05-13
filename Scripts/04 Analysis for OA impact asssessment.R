@@ -492,12 +492,17 @@ openxlsx::write.xlsx(as.data.frame(simple_green), 'Output/Tables/simple_green_br
 ta_2019 = c("Springer")
 ta_2020 = c("European Respiratory Society (ERS)", "IOP Publishing", "IWA Publishing", "Karger Publishers", "Microbiology Society", "Portland Press", "Rockefeller University Press", "SAGE Publications", "Thieme", "Wiley")
 ta_2021 = c("American Physiological Society", "Association for Computing Machinery (ACM)", "Bioscientifica", "Brill Academic Publishers", "Cambridge University Press (CUP)", "Cold Spring Harbor Laboratory", "The Company of Biologists", "Future Science Group", "Royal College of General Practitioners", "Royal Irish Academy", "Geological Society of London", "The Royal Society", "De Gruyter", "Oxford University Press (OUP)", "Taylor & Francis", "BMJ", "Royal Society of Chemistry (RSC)") 
+target_tas <- c("Elsevier", "American Chemical Society (ACS)", "Wolters Kluwer", "Nature")
 
 # Create new variable to split up TAs
 merged_pvga$ta_split <- "No TA"
 merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2019] <- "2019"
 merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2020] <- "2020"
 merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2021] <- "2021"
+merged_pvga$ta_split[merged_pvga$Publisher %in% target_tas] <- "target TAs"
+
+# Proportion of articles in hybrid journals covered by TAs
+ta_coverage <- merged_pvga %>% filter(journal_type == "Hybrid") %>% count(ta_split) %>% mutate(percent=n/sum(n)*100)
 
 # Create stacked bar chart comparing potential compliance with several different assumptions about coverage of Transformative Agreements
 
