@@ -36,6 +36,8 @@ dimensions <- dimensions %>%
 dimensions <- dimensions %>%
   filter(!(is.na(ISSN) & is.na(e.ISSN) & is.na(Source.title)))
 
+save(dimensions, file = "Data/dimensions_filtered.Rda")
+
 #XXXXXXXXXXX
 # 2. DOWNLOADING AND PREPARING ESAC DATA----
 
@@ -80,7 +82,7 @@ esac$Publisher <- gsub("Walter de Gruyter", "De Gruyter", esac$Publisher)
 
 # Add confirmed new agreements not yet on ESACC----
   # ESAC was not updated with these agreements as of 1.04.21 so they need to be added in manually
-temp_ta <- data.frame(c("Taylor & Francis", "BMJ", "Royal Society of Chemistry (RSC)"), "United Kingdom", "JISC", 9999, "09/03/2021", NA, NA)
+temp_ta <- data.frame(c("Taylor & Francis", "BMJ", "Royal Society of Chemistry (RSC)"), "United Kingdom", "Jisc", 9999, "09/03/2021", NA, NA)
 names(temp_ta) <- c("Publisher", "Country", "Organization", "Annual publications", "Start date", "End date", "Details/ ID")
 esac <- bind_rows(esac, temp_ta)
 
@@ -109,15 +111,15 @@ sherpa <- sherpa[,!(names(sherpa) %in% c("issn_NA","issn_legacy", "pubpol_id"))]
 
 #b. recode embargo variable to simplify
   # Recode embargo to simpler form (first 0, 6, 12, >12, then just zero or not)
-sherpa$embargo2 <- NA
-sherpa$embargo2[sherpa$embargo == 0] <- 0
-sherpa$embargo2[sherpa$embargo > 0 & sherpa$embargo <= 6] <- 6
-sherpa$embargo2[sherpa$embargo > 6 & sherpa$embargo <= 12] <- 12
-sherpa$embargo2[sherpa$embargo > 12] <- 13
+sherpa$embargo_grouped <- NA
+sherpa$embargo_grouped[sherpa$embargo == 0] <- 0
+sherpa$embargo_grouped[sherpa$embargo > 0 & sherpa$embargo <= 6] <- 6
+sherpa$embargo_grouped[sherpa$embargo > 6 & sherpa$embargo <= 12] <- 12
+sherpa$embargo_grouped[sherpa$embargo > 12] <- 13
 
     # Binary embargo variable
-sherpa$embargo3[sherpa$embargo == 0] <- "zero embargo"
-sherpa$embargo3[sherpa$embargo != 0] <- "has embargo"
+sherpa$embargo_zero[sherpa$embargo == 0] <- "zero embargo"
+sherpa$embargo_zero[sherpa$embargo != 0] <- "has embargo"
 
 #c. Work with license variable----
   # Create new columns recoding license into CC-BY, CC-BY-ND, CC-BY-SA and license_not_compliant (return missing data as CC-BY(m))
@@ -127,27 +129,27 @@ sherpa$embargo3[sherpa$embargo != 0] <- "has embargo"
     # change blank values into no license requirement
 sherpa$license[sherpa$license == ""] <- "no license requirement"
 
-    # Derive license1 to simplify license and only return one license for each policy (the most permissive)
-sherpa$license1 <- sherpa$license
-sherpa$license1[grepl("cc_by,", sherpa$license1)| sherpa$license1 == "cc_by"] <- "cc_by"
-sherpa$license1[grepl("public_domain,", sherpa$license1)| sherpa$license1 == "public_domain" | sherpa$license1 == "cc_public_domain"] <- "cc_by"
-sherpa$license1[grepl("gnu_gpl,", sherpa$license1)| sherpa$license1 == "gnu_gpl" | sherpa$license1 == "cc_gnu_gpl"] <- "cc_by"
-sherpa$license1[grepl("cc_by_sa,", sherpa$license1)| sherpa$license1 == "cc_by_sa"] <- "cc_by_sa"
-sherpa$license1[grepl("cc_by_nd,", sherpa$license1)| sherpa$license1 == "cc_by_nd"] <- "cc_by_nd"
-sherpa$license1[grepl("cc_by_nc,", sherpa$license1)| sherpa$license1 == "cc_by_nc"] <- "cc_by_nc"
-sherpa$license1[grepl("cc_by_nc_sa,", sherpa$license1)| sherpa$license1 == "cc_by_nc_sa"] <- "cc_by_nc_sa"
-sherpa$license1[grepl("cc_by_nc_nd,", sherpa$license1)| sherpa$license1 == "cc_by_nc_nd"] <- "cc_by_nc_nd"
-sherpa$license1[grepl("bespoke_license,", sherpa$license1)| sherpa$license1 == "bespoke_license"] <- "bespoke_license"
-sherpa$license1[grepl("all_rights_reserved,", sherpa$license1)| sherpa$license1 == "all_rights_reserved"] <- "all_rights_reserved"
+    # Derive license_single to simplify license and only return one license for each policy (the most permissive)
+sherpa$license_single <- sherpa$license
+sherpa$license_single[grepl("cc_by,", sherpa$license_single)| sherpa$license_single == "cc_by"] <- "cc_by"
+sherpa$license_single[grepl("public_domain,", sherpa$license_single)| sherpa$license_single == "public_domain" | sherpa$license_single == "cc_public_domain"] <- "cc_by"
+sherpa$license_single[grepl("gnu_gpl,", sherpa$license_single)| sherpa$license_single == "gnu_gpl" | sherpa$license_single == "cc_gnu_gpl"] <- "cc_by"
+sherpa$license_single[grepl("cc_by_sa,", sherpa$license_single)| sherpa$license_single == "cc_by_sa"] <- "cc_by_sa"
+sherpa$license_single[grepl("cc_by_nd,", sherpa$license_single)| sherpa$license_single == "cc_by_nd"] <- "cc_by_nd"
+sherpa$license_single[grepl("cc_by_nc,", sherpa$license_single)| sherpa$license_single == "cc_by_nc"] <- "cc_by_nc"
+sherpa$license_single[grepl("cc_by_nc_sa,", sherpa$license_single)| sherpa$license_single == "cc_by_nc_sa"] <- "cc_by_nc_sa"
+sherpa$license_single[grepl("cc_by_nc_nd,", sherpa$license_single)| sherpa$license_single == "cc_by_nc_nd"] <- "cc_by_nc_nd"
+sherpa$license_single[grepl("bespoke_license,", sherpa$license_single)| sherpa$license_single == "bespoke_license"] <- "bespoke_license"
+sherpa$license_single[grepl("all_rights_reserved,", sherpa$license_single)| sherpa$license_single == "all_rights_reserved"] <- "all_rights_reserved"
   
-    # Simplify license further into new var license2 merging all licenses which are never compliant in the old policy or new policy scenarios
-sherpa$license2 <- sherpa$license1
-sherpa$license2[sherpa$license2 != "cc_by" & sherpa$license2 != "cc_by_nd" & sherpa$license2 != "cc_by_nc"] <- "no compliant license"
+    # Simplify license further into new var license_compliant merging all licenses which are never compliant in the old policy or new policy scenarios
+sherpa$license_compliant <- sherpa$license_single
+sherpa$license_compliant[sherpa$license_compliant != "cc_by" & sherpa$license_compliant != "cc_by_nd" & sherpa$license_compliant != "cc_by_nc"] <- "no compliant license"
 
     # Binary license variable - is cc_by or isn't
-sherpa$license3 <- NA
-sherpa$license3[sherpa$license1 != "cc_by"] <- "not cc_by"
-sherpa$license3[sherpa$license1 == "cc_by"] <- "cc_by"
+sherpa$license_cc_by <- NA
+sherpa$license_cc_by[sherpa$license_single != "cc_by"] <- "not cc_by"
+sherpa$license_cc_by[sherpa$license_single == "cc_by"] <- "cc_by"
 
 #d. Preparing other variables to rank Sherpa policies ----
 
@@ -170,25 +172,16 @@ sherpa$copyright <- ifelse(sherpa$copyright_owner %in% c("authors", "authors_ins
 
 #e. Create new column to rank Green OA policies----
 
-  # Select only policies where green OA is relevant (additional_oa_fee = no). I originally also excluded listed_in_doaj here but then realised that they many pure gold journals still do have green OA policies (this is presumably why they are in sherpa - in fact almost none of the listed_in_doaj policies are associated with a fee). Also remove policies relating to submitted articles (these aren't peer reviewed)
+  # Select only policies where green OA is relevant (additional_oa_fee = no). I originally also excluded listed_in_doaj here (DOAJ is a listing of gold OA journals) but then realised that they many pure gold journals still do have green OA policies (this is presumably why they are in sherpa - in fact almost none of the listed_in_doaj policies are associated with a fee). Also remove policies relating to submitted articles (these aren't peer reviewed)
 sherpa_green <- sherpa %>%
   filter(additional_oa_fee == "no", article_version != "submitted")
 
   #Create green_ranking which will be used to select the most permissive green policy for each journal
 
-      # Pull out options for each key variable we will ultimately match on (this is only to help fill the strings below)
-# print(sherpa_green$license2[!duplicated(sherpa_green$license2)])
-# print(sherpa_green$embargo2[!duplicated(sherpa_green$embargo2)])
-# print(sherpa_green$compliant_repository[!duplicated(sherpa_green$compliant_repository)])
-# print(sherpa_green$copyright[!duplicated(sherpa_green$copyright)])
-# print(sherpa_green$version_published[!duplicated(sherpa_green$version_published)])
-# print(sherpa_green$embargo3[!duplicated(sherpa_green$embargo3)])
-# print(sherpa_green$license3[!duplicated(sherpa_green$license3)])
-
 require(utils)
 
       # Use expand.grid to create table with every option. NB. The order of both the variables and strings is important here - the most important variables need to come last for the ordering to work and the most permissive options need to come first within each string.
-green_ranking <- expand.grid(version_published = c(TRUE, FALSE), copyright = c("authors", "publishers"), compliant_repository = c(TRUE, FALSE), embargo2 = c(0, 6, 12, 13), license1 = c("cc_by", "cc_by_nd", "cc_by_nc", "cc_by_sa", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke license", "all rights reserved", "no license requirement"), embargo3 = c("zero embargo", "has embargo"), license3 = c("cc_by", "not cc_by"))
+green_ranking <- expand.grid(version_published = c(TRUE, FALSE), copyright = c("authors", "publishers"), compliant_repository = c(TRUE, FALSE), embargo_grouped = c(0, 6, 12, 13), license_single = c("cc_by", "cc_by_nd", "cc_by_nc", "cc_by_sa", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke license", "all rights reserved", "no license requirement"), embargo_zero = c("zero embargo", "has embargo"), license_cc_by = c("cc_by", "not cc_by"))
 
       # Since the observations are ordered by permissiveness, this code simply adds a number for each row which will be the rank
 green_ranking <- green_ranking %>%
@@ -206,7 +199,7 @@ sherpa_green_1row <- sherpa_green_ranked[!duplicated(sherpa_green_ranked$sherpa_
 
     # rename columns in sherpa_green_ranked to avoid confusion to make it clear which policy is which
 sherpa_green_1row <- sherpa_green_1row %>% 
-  rename(g_article_version = article_version, g_license = license, g_license1 = license1, g_license2 = license2, g_license3 = license3, g_copyright_owner = copyright_owner, g_conditions = conditions, g_location.location = location.location,  g_embargo.amount = embargo.amount, g_embargo.units = embargo.units, g_embargo = embargo, g_embargo2 = embargo2, g_embargo3 = embargo3, g_compliant_repository = compliant_repository, g_copyright = copyright, g_version_published = version_published)
+  rename(g_article_version = article_version, g_license = license, g_license_single = license_single, g_license_compliant = license_compliant, g_license_cc_by = license_cc_by, g_copyright_owner = copyright_owner, g_conditions = conditions, g_location.location = location.location,  g_embargo.amount = embargo.amount, g_embargo.units = embargo.units, g_embargo = embargo, g_embargo_grouped = embargo_grouped, g_embargo_zero = embargo_zero, g_compliant_repository = compliant_repository, g_copyright = copyright, g_version_published = version_published)
 
 #f. Create new column to rank paid OA policies----
   #(based on correspondence with JISC we think this is mostly hybrid journals with APCs - fees associated with pure gold OA are not generally recorded as additional_oa_fee)
@@ -214,7 +207,7 @@ sherpa_green_1row <- sherpa_green_1row %>%
 
   # Select only policies where paid OA is relevant
       #additional_oa_fee = yes or 
-      #it's published only version of a pure gold journal (this is assuming that quite a lot of pure gold policies are not associated with an additional fee because there is always a standard fee for publishing in that journal) or,
+      #it's published only version of a pure gold journal (listed_in_doaj is helpful because DOAJ is a listing of pure gold journal) (this is assuming that quite a lot of pure gold policies are not associated with an additional fee because there is always a standard fee for publishing in that journal) or,
       # Article version is submitted or accepted only (there are some policies associated with a fee for accepted/ submitted versions but these can not be compliant and may be errors - I left in ones that also have published version). 
 sherpa_fee <- sherpa %>%
   filter((additional_oa_fee == "yes" | (listed_in_doaj == "yes" & article_version == "published")) & article_version != "submitted" & article_version != "accepted" & article_version != "submitted, accepted")
@@ -222,7 +215,7 @@ sherpa_fee <- sherpa %>%
     # Create column 'rank_fee' to rank policies from most to least permissive
 
       # Use expand.grid to create table with every option. NB. The order is important here - the most important variables need to come last for the ordering to work. The only variables we are interested in here are license (which must be cc_by) and copyright retention (authors preferable)
-fee_ranking <- expand.grid(copyright = c("authors", "publishers"), license3 = c("cc_by", "not cc_by"))
+fee_ranking <- expand.grid(copyright = c("authors", "publishers"), license_cc_by = c("cc_by", "not cc_by"))
 
 fee_ranking <- fee_ranking %>%
   mutate(rank_fee = 1:nrow(fee_ranking))
@@ -238,20 +231,20 @@ sherpa_fee_1row <- sherpa_fee_ranked[!duplicated(sherpa_fee_ranked$sherpa_id, in
 
     # rename columns in sherpa_fee to avoid confusion to make it clear which policy is which
 sherpa_fee_1row <- sherpa_fee_1row %>%
-  rename(fee_article_version = article_version, fee_license = license, fee_license1 = license1, fee_license2 = license2, fee_license3 = license3, fee_copyright_owner = copyright_owner, fee_conditions = conditions, fee_location.location = location.location,  fee_embargo.amount = embargo.amount, fee_embargo.units = embargo.units, fee_embargo = embargo, fee_embargo2 = embargo2, fee_embargo3 = embargo3, fee_compliant_repository = compliant_repository, fee_copyright = copyright, g_version_published = version_published)
+  rename(fee_article_version = article_version, fee_license = license, fee_license_single = license_single, fee_license_compliant = license_compliant, fee_license_cc_by = license_cc_by, fee_copyright_owner = copyright_owner, fee_conditions = conditions, fee_location.location = location.location,  fee_embargo.amount = embargo.amount, fee_embargo.units = embargo.units, fee_embargo = embargo, fee_embargo_grouped = embargo_grouped, fee_embargo_zero = embargo_zero, fee_compliant_repository = compliant_repository, fee_copyright = copyright, g_version_published = version_published)
 
 
 #g. Final process of reducing sherpa to one row per journal----
 
   # Return only one row for each journal for sherpa and remove columns that vary by policy
 sherpa_1row <- sherpa[!duplicated(sherpa$sherpa_id, incomparables = NA), ]
-sherpa_1row <- sherpa_1row[,!(names(sherpa) %in% c("additional_oa_fee", "article_version", "license", "copyright_owner", "conditions", "location.location", "embargo.amount", "embargo.units", "embargo", "embargo1", "embargo2", "embargo3",  "compliant_license", "license1", "license2", "license3", "compliant_repository", "copyright", "version_published"))]
+sherpa_1row <- sherpa_1row[,!(names(sherpa) %in% c("additional_oa_fee", "article_version", "license", "copyright_owner", "conditions", "location.location", "embargo.amount", "embargo.units", "embargo", "embargo1", "embargo_grouped", "embargo_zero",  "compliant_license", "license_single", "license_compliant", "license_cc_by", "compliant_repository", "copyright", "version_published"))]
 sherpa_all_policies <- sherpa # this is just renaming it to make it clearer which is which
 
   # Merge sherpa_green and sherpa_fee into sherpa (essentially this first chooses the first for each of green and fee then merge fee into green and then that into sherpa)
-sherpa_1row <- left_join(sherpa_1row, sherpa_green_1row[ , c("sherpa_id", "g_article_version", "g_version_published", "g_license", "g_license1", "g_license2", "g_license3", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo2","g_embargo3", "g_compliant_repository", "g_copyright", "rank_green")], by = "sherpa_id")
+sherpa_1row <- left_join(sherpa_1row, sherpa_green_1row[ , c("sherpa_id", "g_article_version", "g_version_published", "g_license", "g_license_single", "g_license_compliant", "g_license_cc_by", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo_grouped","g_embargo_zero", "g_compliant_repository", "g_copyright", "rank_green")], by = "sherpa_id")
 
-sherpa_1row <- left_join(sherpa_1row, sherpa_fee_1row[ , c("sherpa_id", "fee_article_version", "fee_license", "fee_license1", "fee_license2", "fee_license3", "fee_copyright_owner", "fee_conditions",  "fee_copyright", "rank_fee")], by = "sherpa_id")
+sherpa_1row <- left_join(sherpa_1row, sherpa_fee_1row[ , c("sherpa_id", "fee_article_version", "fee_license", "fee_license_single", "fee_license_compliant", "fee_license_cc_by", "fee_copyright_owner", "fee_conditions",  "fee_copyright", "rank_fee")], by = "sherpa_id")
 
 # Remove duplicated rows -  I was told by JISC that this had been fixed (i.e. duplicate rows had been removed) but judging from what happened when I reran the code (6.4.21) this is not correct. Since this hasn't been fixed I've added another command which sorts by permissibility (i.e. meaning that most permissive of duplicates will be retained)
 sherpa_1row <- sherpa_1row[order(sherpa_1row$rank_green, sherpa_1row$rank_fee),]
@@ -272,13 +265,13 @@ merged_pvga <- left_join(dimensions, esac[ , c("Publisher", "has_ta")], by = "Pu
 merged_pvga$has_ta[is.na(merged_pvga$has_ta)] <- "no" # this couldn't be created before the merge (i.e. it's highlighting which rows were not merged with esac entries with TAs)
 
 # TEST tO CHECK IF TAs UP TO DATE
-ta_test <- merged_pvga %>% filter(!duplicated(Publisher), has_ta == "yes") # number of observations should be the same as the number of observations in ESAC (assuming every publisher has at least one article in our sample) - if it is lower it means a new publisher has been added to ESAC and that publisher has a different name in Dimensions.
+ta_test <- merged_pvga %>% filter(!duplicated(Publisher), has_ta == "yes") # number of observations should be the same as the number of observations in ESAC (assuming every publisher has at least one article in our sample) - if it is lower it probably means a new publisher has been added to ESAC and that publisher has a different name in Dimensions.
 
 #XXXXXXXXXXXX
-# 5. LEFT-JOINING SHERPA INTO MERGED DIMENSIONS-ESAC----
+# 5. JOINING SHERPA INTO MERGED DIMENSIONS-ESAC----
 
 # Select rows to keep from sherpa
-sherpa_keep_rows <- c("issn_print", "issn_electronic", "j_title", "sherpa_id", "listed_in_doaj", "sherpa_publisher", "system_metadata.uri", "open_access_prohibited", "g_article_version", "g_license", "g_license1", "g_license2", "g_license3", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo2", "g_embargo3", "g_compliant_repository", "g_copyright", "rank_green", "fee_article_version", "fee_license", "fee_license1", "fee_license2", "fee_license3", "fee_copyright_owner", "fee_conditions", "fee_copyright", "rank_fee")
+sherpa_keep_rows <- c("issn_print", "issn_electronic", "j_title", "sherpa_id", "listed_in_doaj", "sherpa_publisher", "system_metadata.uri", "open_access_prohibited", "g_article_version", "g_license", "g_license_single", "g_license_compliant", "g_license_cc_by", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo_grouped", "g_embargo_zero", "g_compliant_repository", "g_copyright", "rank_green", "fee_article_version", "fee_license", "fee_license_single", "fee_license_compliant", "fee_license_cc_by", "fee_copyright_owner", "fee_conditions", "fee_copyright", "rank_fee")
 
 # Series of inner joins to find all possible matches - the reason this is necessary is because no one variable can identify all the matches (e.g. because the wrong ISSN is listed, or because the title is formatted differently in sherpa and dimensions)
 merged_pvga1 <- inner_join(merged_pvga[!is.na(merged_pvga$ISSN),], sherpa_1row[ , sherpa_keep_rows], by = c("ISSN" = "issn_print"))
@@ -314,6 +307,22 @@ articles_per_journal = merged_pvga %>% group_by(Source.title) %>% count()
 merged_pvga <- left_join(merged_pvga, articles_per_journal, by = "Source.title") %>%
   rename(articles_in_journal = n)
 
+# Create value TA_split to give breakdown of proportion of articles covered by current and target TAs
+# NB this code was previously in the analysis script but it makes more sense to have it here
+
+# List of when TAs started
+ta_2019 = c("Springer")
+ta_2020 = c("European Respiratory Society (ERS)", "IOP Publishing", "IWA Publishing", "Karger Publishers", "Microbiology Society", "Portland Press", "Rockefeller University Press", "SAGE Publications", "Thieme", "Wiley")
+ta_2021 = c("American Physiological Society", "Association for Computing Machinery (ACM)", "Bioscientifica", "Brill Academic Publishers", "Cambridge University Press (CUP)", "Cold Spring Harbor Laboratory", "The Company of Biologists", "Future Science Group", "Royal College of General Practitioners", "Royal Irish Academy", "Geological Society of London", "The Royal Society", "De Gruyter", "Oxford University Press (OUP)", "Taylor & Francis", "BMJ", "Royal Society of Chemistry (RSC)") 
+target_tas <- c("Elsevier", "American Chemical Society (ACS)", "Wolters Kluwer", "Nature")
+
+# Create new variable to split up TAs
+merged_pvga$ta_split <- "No TA"
+merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2019] <- "2019"
+merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2020] <- "2020"
+merged_pvga$ta_split[merged_pvga$Publisher %in% ta_2021] <- "2021"
+merged_pvga$ta_split[merged_pvga$Publisher %in% target_tas] <- "target TAs"
+
 # Remove unnecessary variables----
   # (these were mostly metadata not used for analysis or only needed for testing)
 merged_pvga <- subset(merged_pvga, select = -c(issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner, g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions))
@@ -329,7 +338,7 @@ merged_pvga <- subset(merged_pvga, select = -c(issn_electronic, issn_print, j_ti
     #Table 1: Compliance with gold OA
 compliance_fee <- expand.grid(
   journal_type = c("Pure Gold", "Hybrid", "Closed or insufficient information"),
-  fee_license3 = c("cc_by", NA, "not cc_by"))
+  fee_license_cc_by = c("cc_by", NA, "not cc_by"))
 
 compliance_fee <- compliance_fee %>%
   mutate(num_fee = 1:nrow(compliance_fee))
@@ -341,17 +350,17 @@ merged_pvga$embargo_exception <- NA
 merged_pvga$embargo_exception[merged_pvga$ukri_funders %in% c("AHRC", "ESRC")] <- TRUE # not using grepl her as if other ukri funders are involved then exception shouldn't apply
 
 compliance_current_green <- expand.grid(
-  g_embargo2 = c(0, 6, 12, 13),
+  g_embargo_grouped = c(0, 6, 12, 13),
   embargo_exception = c(TRUE, NA),
-  g_license2 = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license"))
+  g_license_compliant = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license"))
 
 compliance_current_green <- compliance_current_green %>%
   mutate(num_current_green = 1:nrow(compliance_current_green))
 
   # Table 3: compliance with green OA in new policy
 compliance_new_green <- expand.grid(
-  g_embargo3 = c("zero embargo", "has embargo"),
-  g_license2 = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license")) # this will lead to one article with NA as there is one cc_by_nd, but including it would make the table much more complex)
+  g_embargo_zero = c("zero embargo", "has embargo"),
+  g_license_compliant = c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license")) # this will lead to one article with NA as there is one cc_by_nd, but including it would make the table much more complex)
 
 compliance_new_green <- compliance_new_green %>%
   mutate(num_new_green = 1:nrow(compliance_new_green))
@@ -425,6 +434,15 @@ merged_pvga$compliance_new_pure[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gol
 merged_pvga$compliance_new_pure[!merged_pvga$num_fee %in% c(1,4) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
 merged_pvga$compliance_new_pure[is.na(merged_pvga$compliance_new_pure)] <- "not compliant"
 
+#f. Compliance_new, if JISC achieves target TAs----
+
+merged_pvga$compliance_new_target_TAs <- NA
+merged_pvga$compliance_new_target_TAs[merged_pvga$num_fee %in% c(1,4)] <- "c: pure gold"
+merged_pvga$compliance_new_target_TAs[merged_pvga$ta_split %in% c("2019","2020","2021", "target TAs") & merged_pvga$num_fee %in% c(2,5)] <- "c: hybrid gold with a TA"
+merged_pvga$compliance_new_target_TAs[!merged_pvga$num_fee %in% c(1,4) & !(merged_pvga$ta_split %in% c("2019","2020","2021", "target TAs") &
+                                                                             merged_pvga$num_fee %in% c(2,5)) & merged_pvga$num_new_green %in% c(1,3)] <- "c: confirmed green oa"
+merged_pvga$compliance_new_target_TAs[is.na(merged_pvga$compliance_new_target_TAs)] <- "No supported route"
+
 
 #####8. FINAL EDITS TO MERGED PVGA----
 
@@ -434,17 +452,17 @@ merged_pvga$compliance_new_pure[is.na(merged_pvga$compliance_new_pure)] <- "not 
 merged_pvga$Open.Access <- factor(merged_pvga$Open.Access, ordered = TRUE, levels = c("Pure Gold", "Hybrid", "Green, Published", "Green, Accepted", "Bronze", "Green, Submitted", "Closed"))
 merged_pvga$Open.Access2 <- factor(merged_pvga$Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))
 
-  # Recode g_embargo3 as a factor
+  # Recode g_embargo_zero as a factor
 merged_pvga$g_embargo <- factor(merged_pvga$g_embargo, ordered = TRUE, levels = c(0,3,6,12,18,24,36,48,NA))
-merged_pvga$g_embargo2 <- factor(merged_pvga$g_embargo2, ordered = TRUE, levels = c(0,6,12,13))
-merged_pvga$g_embargo3 <- factor(merged_pvga$g_embargo3, ordered = TRUE, levels = c("zero embargo", "has embargo"))
+merged_pvga$g_embargo_grouped <- factor(merged_pvga$g_embargo_grouped, ordered = TRUE, levels = c(0,6,12,13))
+merged_pvga$g_embargo_zero <- factor(merged_pvga$g_embargo_zero, ordered = TRUE, levels = c("zero embargo", "has embargo"))
 
   # Recode g_compliant_repository as a factor
 merged_pvga$g_compliant_repository <- factor(merged_pvga$g_compliant_repository, ordered = TRUE, levels = c(TRUE, FALSE))
 
   # Turn license vars into factor to order by permissiveness (just to make outputs clearer)
-merged_pvga$g_license1 <- factor(merged_pvga$g_license1, ordered = TRUE, c("cc_by", "cc_by_sa", "cc_by_nd", "cc_by_nc", "cc_by_nc_sa", "cc_by_nc_nd", "bespoke_license", "all_rights_reserved", "no license requirement", NA))
-merged_pvga$g_license2 <- factor(merged_pvga$g_license2, ordered = TRUE, c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license", NA))
+merged_pvga$g_license_single <- factor(merged_pvga$g_license_single, ordered = TRUE, c("cc_by", "cc_by_sa", "cc_by_nd", "cc_by_nc", "cc_by_nc_sa", "cc_by_nc_nd", "bespoke_license", "all_rights_reserved", "no license requirement", NA))
+merged_pvga$g_license_compliant <- factor(merged_pvga$g_license_compliant, ordered = TRUE, c("cc_by", "cc_by_nd", "cc_by_nc", "no compliant license", NA))
 
   # Recode compliance vars as factors
 merged_pvga$compliance_current <- factor(merged_pvga$compliance_current, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold", "c: confirmed green oa", "not compliant"))
@@ -455,20 +473,30 @@ merged_pvga$compliance_new <- factor(merged_pvga$compliance_new, ordered = TRUE,
 
 merged_pvga$compliance_new_pure <- factor(merged_pvga$compliance_new_pure, ordered = TRUE, levels = c("c: pure gold", "c: confirmed green oa", "not compliant"))
 
+merged_pvga$compliance_new_target_TAs <- factor(merged_pvga$compliance_new_target_TAs, ordered = TRUE, levels = c("c: pure gold", "c: hybrid gold with a TA", "c: confirmed green oa", "No supported route"))
+
   # Recode journal_type as factor
 merged_pvga$journal_type <- factor(merged_pvga$journal_type, ordered = TRUE, levels = c("Pure Gold", "Hybrid", "Closed or insufficient information"))
 
+
 # Code which will allow for reproducible random reordering of rows----
-  #(e.g. when getting rid of duplicates)
+  # this is needed because of code in the analysis script which removes duplicates on journal_title to select only one row for each journal, and thus approximate results at a journal level. The randomisation removes risk of systematic bias in which article is selected for each journal (though the measure is still a proxy at best)
 set.seed(42)
 rows <- sample(nrow(merged_pvga))
 merged_pvga <- merged_pvga[rows, ]
 
 
 #XXXXXXXXXX
-# 7. WRITE MERGED_PVGA TO EXCEL AND RDA ----
+# 7. SELECTING ONLY VARIABLES USED IN THE ANALYSIS----
+# this only includes variables which are used in the analysis
+merged_pvga <- merged_pvga %>%
+  select(-c(Units.of.Assessment, open_access_prohibited, rank_green, rank_fee, num_current_green, compliance_current2, compliance_new_hybrid2, fee_article_version))
+
+
+# 8. WRITE MERGED_PVGA TO EXCEL AND RDA ----
 
 openxlsx::write.xlsx(as.data.frame(merged_pvga), 'Data/merged_pvga.xlsx')
+write_tsv(merged_pvga[1:1000,], file = "Data/merged_pvga_1000.tsv")
 save(merged_pvga, file = "Data/merged_pvga.Rda")
 
 # Merged PVGA: We have a Sherpa link for 97.5% of the publications in the Dimensions sample. We have green (no fee) routes for almost all of these and paid (fee) routes for about three-fifths.

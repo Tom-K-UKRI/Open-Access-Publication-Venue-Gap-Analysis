@@ -28,27 +28,11 @@ dimensions <- dimensions_ukri
 # Remove duplicate rows---- 
   #(using doi and title - the latter may remove a few different articles which have the same name but manual checks suggest the vast majority of duplicate titles are the same article or things like corrections and they skew very heavily towards open access).
 dimensions <- dimensions %>%
-  filter(!duplicated(DOI), !(duplicated(Title) & duplicated(PubYear) & duplicated(Publisher)))
+  arrange(rowSums(sapply((dimensions %>% select(-c(PMID, Country.of.Research.organization, Units.of.Assessment))), is.na))) %>% # this ensures that the final data has the minimum possible number of missing values (by ranking according to number of missing values (excluding variables we are less interested in))
+  filter(!duplicated(DOI) & !(duplicated(Title)))
 
 # Lowercase Source.title to aid matching with Sherpa----
 dimensions$Source.title <- tolower(dimensions$Source.title)
-
-# # renaming values in research_org_country_names to leave only the names themselves. This is no longer needed since most recent Dimensions download
-# dimensions <- dimensions %>%
-#   mutate(research_org_country_names = gsub("\\[\"", "", research_org_country_names)) %>%
-#   mutate(research_org_country_names = gsub("\",\"", ", ", research_org_country_names)) %>%
-#   mutate(research_org_country_names = gsub("\"\\]", "", research_org_country_names))
-
-# Editing open access variable----
-
-# renaming (simplifying) values in Open.Access (no longer needed in latest dimensions download).
-# dimensions$Open.Access[grepl("Closed", dimensions$Open.Access)] <- "Closed"
-# dimensions$Open.Access[grepl("Bronze", dimensions$Open.Access)] <- "Bronze"
-# dimensions$Open.Access[grepl("Hybrid", dimensions$Open.Access)] <- "Hybrid"
-# dimensions$Open.Access[grepl("Pure Gold", dimensions$Open.Access)] <- "Pure gold"
-# dimensions$Open.Access[grepl("Green, Accepted", dimensions$Open.Access)] <- "Green, accepted"
-# dimensions$Open.Access[grepl("Green, Submitted", dimensions$Open.Access)] <- "Green, submitted"
-# dimensions$Open.Access[grepl("Green, Published", dimensions$Open.Access)] <- "Green, published"
 
 # Removing 'all OA' from Dimensions OACs
 dimensions <- dimensions %>%
@@ -130,6 +114,7 @@ dimensions_disciplines$n[Discipline == "Physical Sciences"] <- sum(str_count(dim
 dimensions_disciplines$n[Discipline == "Health Sciences"] <- sum(str_count(dimensions$discipline, "Health Sciences"))
 dimensions_disciplines$n[Discipline == "Social Sciences"] <- sum(str_count(dimensions$discipline, "Social Sciences"))
 dimensions_disciplines$n[Discipline == "Life Sciences"] <- sum(str_count(dimensions$discipline, "Life Sciences"))
+
 dimensions_disciplines <- dimensions_disciplines %>%
   mutate(percent=round(n/sum(n)*100,1))
 

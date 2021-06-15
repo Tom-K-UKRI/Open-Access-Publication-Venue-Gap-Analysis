@@ -76,15 +76,15 @@ write.xlsx(all_licenses, file = "Output/Tables/All licenses.xlsx")
 
 # Ultimately creating a stacked bar chart comparing actual OA, potential compliance with the current policy and all three potential compliance scenarios (current, funding for all, funding for hybrid with TAs, funding for fully OA only).
 
-  # Current OA status - no longer including as doesn't fit
-# Open.Access_a <- merged_pvga %>% # article level
-#   count(Open.Access2) %>%
-#   mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
+  # Current OA status
+Open.Access_a <- merged_pvga %>% # article level
+  count(Open.Access2) %>%
+  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
 
   # Potential compliance with current policy
 compliance_current_a <- merged_pvga %>%
   count(compliance_current, .drop = FALSE) %>%
-  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\nRCUK policy")
+  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(potential)")
 
   # Potential compliance with Scenario 1
 compliance_h_a <- merged_pvga %>%
@@ -107,15 +107,15 @@ compliance_new_pure_a <- merged_pvga %>%
   mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "S3 (hybrid\ngold not\nsupported")
 
 # Bind together figures for each scenario
-policy_impact_a <- bind_rows(compliance_current_a, compliance_h_a, compliance_new_a, compliance_new_target_TAs_a, compliance_new_pure_a) %>%
-  unite(Compliance_Route, c('compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
+policy_impact_a <- bind_rows(Open.Access_a, compliance_current_a, compliance_h_a, compliance_new_a, compliance_new_target_TAs_a, compliance_new_pure_a) %>%
+  unite(Compliance_Route, c('Open.Access2', 'compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
   relocate(5,1,2,3,4)
 
   # Label each compliance route
-policy_impact_a[c(1,5,9,13,17), 'Compliance_Route'] <- "Gold OA in\nfully oa journal\n"
-policy_impact_a[c(2,6,10,14), 'Compliance_Route'] <- "Gold OA in\nhybrid gold journal\n(with TAs for S2)"
-policy_impact_a[c(3,7,11,15,18), 'Compliance_Route'] <- "\nConfirmed green OA\n"
-policy_impact_a[c(4,8,12,16,19), 'Compliance_Route'] <- "None identified under\ncurrent journal policies\n"
+policy_impact_a[c(1,5,9,13,17,21), 'Compliance_Route'] <- "Gold OA in\nfully oa journal\n"
+policy_impact_a[c(2,6,10,14,18), 'Compliance_Route'] <- "Gold OA in\nhybrid gold journal\n(with TAs for S2)"
+policy_impact_a[c(3,7,11,15,19,22), 'Compliance_Route'] <- "\nConfirmed green OA\n"
+policy_impact_a[c(4,8,12,16,20,23), 'Compliance_Route'] <- "None identified under\ncurrent journal policies\n"
 
 policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c(
   "Gold OA in\nfully oa journal\n", 
@@ -144,28 +144,7 @@ ggsave(policy_impact_a_bar, filename = "Output/Charts/Impact of each policy scen
        width = 12.5, height = 6, dpi = 300)
 
 # Create summary table to compare scenarios - subset percentages only
-
-Open.Access_a <- merged_pvga %>% # adding current OA back in for table
-  count(Open.Access2) %>%
-  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
-
-policy_impact_a_table <- bind_rows(Open.Access_a, compliance_current_a, compliance_h_a, compliance_new_a, compliance_new_target_TAs_a, compliance_new_pure_a) %>%
-  unite(Compliance_Route, c('Open.Access2', 'compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
-  relocate(5,1,2,3,4)
-
-# Label each compliance route
-policy_impact_a_table[c(1,5,9,13,17,21), 'Compliance_Route'] <- "Gold OA in\nfully oa journal\n"
-policy_impact_a_table[c(2,6,10,14,18), 'Compliance_Route'] <- "Gold OA in\nhybrid gold journal\n(with TAs for S2)"
-policy_impact_a_table[c(3,7,11,15,19,22), 'Compliance_Route'] <- "\nConfirmed green OA\n"
-policy_impact_a_table[c(4,8,12,16,20,23), 'Compliance_Route'] <- "None identified under\ncurrent journal policies\n"
-
-policy_impact_a$Compliance_Route <- factor(policy_impact_a$Compliance_Route, ordered = TRUE, levels = c(
-  "Gold OA in\nfully oa journal\n", 
-  "Gold OA in\nhybrid gold journal\n(with TAs for S2)", 
-  "\nConfirmed green OA\n", 
-  "None identified under\ncurrent journal policies\n")) # this is needed so they appear in order in table/chart
-
-policy_impact_a_summary <- policy_impact_a_table %>%
+policy_impact_a_summary <- policy_impact_a %>%
   select(-c(n, cml)) %>%
   pivot_wider(names_from = Scenario, values_from = percent) %>%
   arrange(factor(Compliance_Route, levels = c("Full gold OA", "Hybrid gold\n(with TA for S2)", "Confirmed green OA", "No confirmed supported\nroute to open access")))
@@ -176,17 +155,12 @@ openxlsx::write.xlsx(as.data.frame(policy_impact_a_summary), 'Output/Tables/poli
 
 # BREAKDOWN OF ARTICLES WITHOUT SUPPORTED ROUTE TO OA IN NEW POLICy----
 why_unsupported <- merged_pvga %>%
-  filter(compliance_new == "not compliant") %>%
+  filter(compliance_new2 == "not compliant") %>%
   count(journal_type, fee_license_cc_by, has_ta) %>%
   mutate(percent=round(n/sum(n)*100,1))
 
 write.xlsx(why_unsupported, file = "Output/Tables/why unsupported by new policy.xlsx")
 
-  # same but for Target TAs in place scenario
-why_unsupported <- merged_pvga %>%
-  filter(compliance_new_target_TAs == "No supported route") %>%
-  count(journal_type, fee_license_cc_by, has_ta) %>%
-  mutate(percent=round(n/sum(n)*100,2))
 
 # ACTUAL OPEN ACCESS STATUS----
   # this is using Dimensions variable Open.Access (simplified to Open.Access2 which merges categories to match main UKRI categories)
@@ -317,22 +291,6 @@ compliance_new_disc <- disciplines %>%
 
 compliance_new_disc$disc[is.na(compliance_new_disc$disc)] <- "Missing"
 
-  # what does it look like with target TAs in place?
-compliance_new_disc_target_TAs <- disciplines %>%
-  filter(!is.na(disc)) %>%
-  group_by(disc) %>%
-  count(compliance_new_target_TAs) %>%
-  mutate(percent = round(n/sum(n)*100,1)) %>%
-  mutate(total_n = sum(n)) %>%
-  select(-n) %>%
-  pivot_wider(names_from = compliance_new_target_TAs, values_from = c(percent, total_n)) %>%
-  mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  rename(total_n = "total_n_c: pure gold") %>%
-  select(-c(7,8,9,10)) %>%
-  relocate(1,6)
-
-compliance_new_disc$disc[is.na(compliance_new_disc$disc)] <- "Missing"
-
     # Add column to show proportion of each division covered by TA
 TA_disc <- disciplines %>%
   filter(!is.na(disc), journal_type == "Hybrid") %>%
@@ -399,29 +357,11 @@ compliance_new_division <- divisions %>%
   select(-n) %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_No supported route`), na.rm = TRUE) %>%
-  mutate(total_n = gsub(".*_", "", total_n)) %>%
-  relocate(division,total_n)
+  rename(total_n = "total_n_c: pure gold") %>%
+  select(-c(7,8,9)) %>%
+  relocate(1,7)
 
 compliance_new_division$division[is.na(compliance_new_division$division)] <- "Missing"
-
-  #what does it look like with target TAs?
-
-compliance_new_division_target_TAs <- divisions %>%
-  filter(!is.na(division)) %>%
-  group_by(division) %>%
-  count(compliance_new_target_TAs) %>%
-  mutate(percent = round(n/sum(n)*100,2)) %>%
-  mutate(total_n = sum(n)) %>%
-  select(-n) %>%
-  pivot_wider(names_from = compliance_new_target_TAs, values_from = c(percent, total_n)) %>%
-  mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_No supported route`), na.rm = TRUE) %>%
-  mutate(total_n = gsub(".*_", "", total_n)) %>%
-  relocate(division,total_n)
-
-compliance_new_division_target_TAs$division[is.na(compliance_new_division_target_TAs$division)] <- "Missing"
-
 
       # Add column to show proportion of each division covered by TA
 
@@ -458,27 +398,11 @@ compliance_new_group <- groups %>%
   select(-n) %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_No supported route`), na.rm = TRUE) %>%
-  mutate(total_n = gsub(".*_", "", total_n)) %>%
-  relocate(group,total_n)
+  rename(total_n = "total_n_c: pure gold") %>%
+  select(-c(7,8,9)) %>%
+  relocate(1,7)
 
 compliance_new_group$group[is.na(compliance_new_group$group)] <- "Missing"
-
-    # what does it look like with Jisc target TAs in place?
-compliance_new_group_target_TAs <- groups %>%
-  filter(!is.na(group)) %>%
-  group_by(group) %>%
-  count(compliance_new_target_TAs) %>%
-  mutate(percent = round(n/sum(n)*100,1)) %>%
-  mutate(total_n = sum(n, na.rm = TRUE)) %>%
-  select(-n) %>%
-  pivot_wider(names_from = compliance_new_target_TAs, values_from = c(percent, total_n)) %>%
-  mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_No supported route`), na.rm = TRUE) %>%
-  mutate(total_n = gsub(".*_", "", total_n)) %>%
-  relocate(group,total_n)
-
-compliance_new_group_target_TAs$group[is.na(compliance_new_group_target_TAs$group)] <- "Missing"
 
     # Proportion of specialisms covered by TAs
 TA_group <- groups %>%
