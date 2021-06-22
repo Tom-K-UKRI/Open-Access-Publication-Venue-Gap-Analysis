@@ -16,9 +16,14 @@ rm(list=ls())
 # dimensions_uk <- read_tsv(file = "Data/Raw data/20210401 Dimensions export pubs UK ROs 2014-2020.tsv") # this is all articles associated with UK ROs 2014-2020 but not using this in current version of analysis
 
 dimensions_ukri <- read_tsv(file = "Data/Raw data/20210401 Dimensions export pubs UKRI funded 2014-2020.tsv") # this is all articles associated with UKRI funding 2014-2020
+dimensions_ukri_ROs <- read_tsv(file = "Data/Raw data/20210711 Dimensions export articles proceedings UKRI funded UK ROs 2013-2021.tsv") # this is to add in UK-based Research organisation which wasn't included in original data. Obviously it would be better to just replace with one updated data if updating this analysis
 
 # Make column names tidy - this is needed because the version sent by Dimensions had spaces in column titles
 names(dimensions_ukri) <- make.names(names(dimensions_ukri), unique = TRUE)
+names(dimensions_ukri_ROs) <- make.names(names(dimensions_ukri_ROs), unique = TRUE)
+
+dimensions_ukri <- dimensions_ukri %>% distinct(DOI, .keep_all = TRUE) %>%
+  left_join(dimensions_ukri_ROs %>% distinct(DOI, .keep_all = TRUE) %>%  select(DOI, Research.Organizations...standardized) )
 
 # Rename to Dimensions
 dimensions <- dimensions_ukri
@@ -118,7 +123,7 @@ dimensions_disciplines$n[Discipline == "Life Sciences"] <- sum(str_count(dimensi
 dimensions_disciplines <- dimensions_disciplines %>%
   mutate(percent=round(n/sum(n)*100,1))
 
-write.xlsx(dimensions_disciplines, file = "Output/Tables/Discipline frequency.xlsx")
+# write.xlsx(dimensions_disciplines, file = "Output/Tables/Discipline frequency.xlsx")
 
 # Breaking up Springer Nature----
   # Editing Publisher to split up Springer and Nature (this is important because as of Mar 2021 former has TA and latter doesn't)     
@@ -127,7 +132,7 @@ dimensions$Publisher[dimensions$Publisher == "Springer Nature" & !grepl("nature"
 
 
 # changing column order (this also serves to remove unnecessary columns. If any new columns added they will need to be added here)
-col_order <- (c("Title", "DOI", "Publication.Date", "PubYear", "Source.title", "Publisher", "ISSN", "e.ISSN", "Publication.Type", 'Country.of.Research.organization', "FOR..ANZSRC..Categories", "for_division", "for_group", "discipline", "Open.Access", "Open.Access2", "Funder", "ukri_funders", "Units.of.Assessment"))
+col_order <- (c("Title", "DOI", "Publication.Date", "PubYear", "Source.title", "Publisher", "ISSN", "e.ISSN", "Publication.Type", 'Country.of.Research.organization', "Research.Organizations...standardized", "FOR..ANZSRC..Categories", "for_division", "for_group", "discipline", "Open.Access", "Open.Access2", "Funder", "ukri_funders", "Units.of.Assessment"))
 dimensions <- dimensions[, col_order]
 
 openxlsx::write.xlsx(as.data.frame(dimensions), 'Data/Dimensions.xlsx')
