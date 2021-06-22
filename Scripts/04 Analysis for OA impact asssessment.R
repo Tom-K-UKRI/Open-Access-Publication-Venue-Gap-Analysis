@@ -237,6 +237,34 @@ Open.Access_a_disc_bar <- Open.Access_a_disc %>%
 ggsave(Open.Access_a_disc_bar, filename = "Output/Charts/Open.Access_a_disc_bar.png", width = 9, height = 5, dpi = 300)
 
 
+# Actual open access x research organisation----
+universities <- merged_pvga %>% 
+  separate(Research.Organizations...standardized, into = c("uni1", "uni2", "uni3", "uni4", "uni5", "uni6", "uni7", "uni8","uni9", "uni10",
+                                                           "uni11", "uni12", "uni13", "uni14", "uni15", "uni16"), sep = "; ") %>%
+  pivot_longer(c(uni1, uni2, uni3, uni4, uni5, uni6, uni7, uni8, uni9, uni10, uni11, uni12, uni13, uni14, uni15, uni16),
+               names_to = "uni_all", values_to ="uni")
+
+
+Open.Access_a_uni <- universities %>%
+  filter(!is.na(uni)) %>%
+  mutate(Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
+  group_by(uni) %>%
+  count(Open.Access2, .drop = FALSE) %>%
+  mutate(percent = (n / sum(n)) * 100) %>%
+  mutate(cml = round(cumsum(percent),1)) %>%
+  mutate(percent = round(percent, 1)) %>%
+  group_by(uni) %>%
+  summarise(group_size = sum(n),
+            gold = sum(percent[Open.Access2 %in% c("Pure Gold", "Hybrid gold")]),
+            green = percent[Open.Access2 == "Green"],
+            compliant = sum(percent[Open.Access2 %in% c("Pure Gold", "Hybrid gold", "Green")])) %>%
+  arrange(desc(group_size), uni) %>%
+  mutate(proportion_all_articles = group_size/sum(group_size)*100)
+
+openxlsx::write.xlsx(as.data.frame(Open.Access_a_uni), 'Output/Tables/Open.Access_a_uni.xlsx')
+
+
+
 # VARIATION OF POLICY IMPACT BY GROUP----
 
 # 1. Variation by UKRI funder----
