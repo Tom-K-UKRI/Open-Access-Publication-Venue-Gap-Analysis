@@ -58,7 +58,7 @@ all_green_licenses_exc_pure <- merged_pvga %>%
   arrange(g_license_single) %>%
   adorn_totals("row")
 
-  # for gold policies (excluding Pure Gold since we believe that these are not green policies per se)
+  # for gold policies
 all_fee_licenses <- merged_pvga %>%
   filter(!is.na(fee_license_single)) %>%
   count(fee_license_single, .drop = FALSE) %>%
@@ -78,7 +78,7 @@ write.xlsx(all_licenses, file = "Output/Tables/All licenses.xlsx")
 
   # Current OA status - no longer including as doesn't fit
 # Open.Access_a <- merged_pvga %>% # article level
-#   count(Open.Access2) %>%
+#   count(Open.Access_ukri) %>%
 #   mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
 
   # Potential compliance with current policy
@@ -146,11 +146,11 @@ ggsave(policy_impact_a_bar, filename = "Output/Charts/Impact of each policy scen
 # Create summary table to compare scenarios - subset percentages only
 
 Open.Access_a <- merged_pvga %>% # adding current OA back in for table
-  count(Open.Access2) %>%
+  count(Open.Access_ukri) %>%
   mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
 
 policy_impact_a_table <- bind_rows(Open.Access_a, compliance_current_a, compliance_h_a, compliance_new_a, compliance_new_target_TAs_a, compliance_new_pure_a) %>%
-  unite(Compliance_Route, c('Open.Access2', 'compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
+  unite(Compliance_Route, c('Open.Access_ukri', 'compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
   relocate(5,1,2,3,4)
 
 # Label each compliance route
@@ -189,11 +189,11 @@ why_unsupported <- merged_pvga %>%
   mutate(percent=round(n/sum(n)*100,2))
 
 # ACTUAL OPEN ACCESS STATUS----
-  # this is using Dimensions variable Open.Access (simplified to Open.Access2 which merges categories to match main UKRI categories)
+  # this is using Dimensions variable Open.Access (simplified to Open.Access_ukri which merges categories to match main UKRI categories)
   # there is a more complex version of this table showing average number of articles per OA type but not used in current version of finding so only including simple version here.
 
 Open.Access_a <- merged_pvga %>% # article level
-  count(Open.Access2) %>%
+  count(Open.Access_ukri) %>%
   mutate(percent = round(n / sum(n) * 100,1)) %>%
   adorn_totals("row")
 
@@ -209,20 +209,20 @@ disciplines <- merged_pvga %>%
 Open.Access_a_disc <- disciplines %>%
   filter(!is.na(disc)) %>%
   group_by(disc) %>%
-  count(Open.Access2, .drop = FALSE) %>%
+  count(Open.Access_ukri, .drop = FALSE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
   mutate(cml = round(cumsum(percent),1)) %>%
   mutate(percent = round(percent, 1)) %>%
   mutate(disc = factor(disc, ordered = TRUE, levels = c("Arts & Humanities", "Health Sciences", "Life Sciences", "Physical Sciences", "Social Sciences", "Missing")), 
-         Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
-  arrange(disc, Open.Access2)
+         Open.Access_ukri = factor(Open.Access_ukri, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
+  arrange(disc, Open.Access_ukri)
 
 openxlsx::write.xlsx(as.data.frame(Open.Access_a_disc), 'Output/Tables/Open.Access_a_disc.xlsx')
 
 # Bar
 Open.Access_a_disc_bar <- Open.Access_a_disc %>%
   ggplot(aes(x=disc, y=percent)) +
-  geom_bar(aes(fill=Open.Access2), stat = "identity", position = "stack", width = 0.9) +
+  geom_bar(aes(fill=Open.Access_ukri), stat = "identity", position = "stack", width = 0.9) +
   scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Open Access Category", labels = c("Gold OA in fully\nOA journal\n", "Gold OA in Hybrid\njournal\n", "Green OA (Version\nof Record or Author\nAccepted Manuscript", "\nNo OA version identified\n")) +
   # ggtitle("Open Access Categories by discipline") +
   theme(axis.title.x = element_text(face="bold", size=16, margin = margin(t=10)),
@@ -247,17 +247,17 @@ universities <- merged_pvga %>%
 
 Open.Access_a_uni <- universities %>%
   filter(!is.na(uni)) %>%
-  mutate(Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
+  mutate(Open.Access_ukri = factor(Open.Access_ukri, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
   group_by(uni) %>%
-  count(Open.Access2, .drop = FALSE) %>%
+  count(Open.Access_ukri, .drop = FALSE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
   mutate(cml = round(cumsum(percent),1)) %>%
   mutate(percent = round(percent, 1)) %>%
   group_by(uni) %>%
   summarise(group_size = sum(n),
-            gold = sum(percent[Open.Access2 %in% c("Pure Gold", "Hybrid gold")]),
-            green = percent[Open.Access2 == "Green"],
-            compliant = sum(percent[Open.Access2 %in% c("Pure Gold", "Hybrid gold", "Green")])) %>%
+            gold = sum(percent[Open.Access_ukri %in% c("Pure Gold", "Hybrid gold")]),
+            green = percent[Open.Access_ukri == "Green"],
+            compliant = sum(percent[Open.Access_ukri %in% c("Pure Gold", "Hybrid gold", "Green")])) %>%
   arrange(desc(group_size), uni) %>%
   mutate(proportion_all_articles = group_size/sum(group_size)*100)
 
@@ -534,8 +534,8 @@ openxlsx::write.xlsx(as.data.frame(compliance_new_group_ta), 'Output/Tables/comp
 #  Top Publishers and oac
 top_publishers_oac <- merged_pvga %>%
   group_by(Publisher) %>%
-  count(Open.Access2) %>%
-  pivot_wider(names_from = Open.Access2, values_from = n) %>%
+  count(Open.Access_ukri) %>%
+  pivot_wider(names_from = Open.Access_ukri, values_from = n) %>%
   adorn_totals("col") %>%
   rename(pure_gold = "Pure Gold", hybrid_gold = "Hybrid gold") %>%
   mutate(pure_percent = round(pure_gold/Total*100,1), hybrid_gold_percent = round(hybrid_gold/Total*100,1), green_percent = round(Green/Total*100,1), closed_percent = round(Closed/Total*100,1)) %>%
