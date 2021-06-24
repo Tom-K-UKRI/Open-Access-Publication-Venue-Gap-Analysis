@@ -20,23 +20,9 @@ library(xml2)
 library(rvest)
 
 ######### 1. IMPORTING DIMENSIONS DATA----
-# NB. This data was downloaded and cleaned in script "Downloading and cleaning Dimensions data"
+# NB. This data was downloaded, cleaned and filtered in script "Downloading and cleaning Dimensions data"
 
-load("Data/Dimensions.Rda")
-
-# Filter to include only articles from 2017-2020
-dimensions <- dimensions %>%
-  filter(PubYear %in% c(2017, 2018, 2019, 2020))
-
-# Filter to only include articles and proceedings (i.e. to exclude books, chapters, monographs, and preprints)
-dimensions <- dimensions %>%
-  filter(Publication.Type %in% c("Article", "Proceeding"))
-
-# Filter to exclude publications without a journal or issn recorded (this is almost all proceedings)
-dimensions <- dimensions %>%
-  filter(!(is.na(ISSN) & is.na(e.ISSN) & is.na(Source.title)))
-
-save(dimensions, file = "Data/dimensions_filtered.Rda")
+load("Data/dimensions_filtered.Rda")
 
 #XXXXXXXXXXX
 # 2. DOWNLOADING AND PREPARING ESAC DATA----
@@ -256,9 +242,13 @@ sherpa_1row$j_title <- with(sherpa_1row, make.unique(as.character(j_title)))
 
 #openxlsx::write.xlsx(as.data.frame(sherpa_1row), 'Data/sherpa_1row.xlsx') # This is the complete SHERPA database (most permissive policies for each journal)
 
+#XXXXXXXXXX
+# 4. IMPORTING UNPAYWALL DATA ON GREEN OA----
+load("Data/unpaywall_green_plus_gold_licences.RData")
+
 
 #XXXXXXXXXX
-# 4. LEFT-JOINING ESAC INTO DIMENSIONS MATCHING ON 'PUBLISHER'----
+# 5. LEFT-JOINING ESAC INTO DIMENSIONS MATCHING ON 'PUBLISHER'----
 
 merged_pvga <- left_join(dimensions, esac[ , c("Publisher", "has_ta")], by = "Publisher")
 
@@ -268,7 +258,7 @@ merged_pvga$has_ta[is.na(merged_pvga$has_ta)] <- "no" # this couldn't be created
 ta_test <- merged_pvga %>% filter(!duplicated(Publisher), has_ta == "yes") # number of observations should be the same as the number of observations in ESAC (assuming every publisher has at least one article in our sample) - if it is lower it probably means a new publisher has been added to ESAC and that publisher has a different name in Dimensions.
 
 #XXXXXXXXXXXX
-# 5. JOINING SHERPA INTO MERGED DIMENSIONS-ESAC----
+# 6. JOINING SHERPA INTO MERGED DIMENSIONS-ESAC----
 
 # Select rows to keep from sherpa
 sherpa_keep_rows <- c("issn_print", "issn_electronic", "j_title", "sherpa_id", "listed_in_doaj", "sherpa_publisher", "system_metadata.uri", "open_access_prohibited", "g_article_version", "g_license", "g_license_single", "g_license_compliant", "g_license_cc_by", "g_copyright_owner", "g_conditions", "g_location.location", "g_embargo.amount", "g_embargo.units", "g_embargo", "g_embargo_grouped", "g_embargo_zero", "g_compliant_repository", "g_copyright", "rank_green", "fee_article_version", "fee_license", "fee_license_single", "fee_license_compliant", "fee_license_cc_by", "fee_copyright_owner", "fee_conditions", "fee_copyright", "rank_fee")
@@ -290,9 +280,23 @@ merged_pvga0 <- left_join(merged_pvga, merged_pvga4[ , c("DOI", "sherpa_id")], b
 # Merge these non-matched rows with the matched rows
 merged_pvga <- bind_rows(merged_pvga0, merged_pvga4)
 
+# 7. JOINING UNPAYWALL INTO MERGED DIMENSIONS-ESAC-SHERPA----
+
+merged_pvga <- merged_pvga %>%
+  left_join(unpaywall_green_plus_gold_licences, by = c("DOI" = "doi"))
 
 #XXXXXXXXXXXXX
-# 6. EDITS TO MERGED_PVGA----
+# 8. EDITS TO MERGED_PVGA----
+
+# Refine Open Access variable to match UKRI policy----
+  # Dimensions ranks Bronze OA > Green OA, but UKRI ranks Green OA > Bronze OA and considers Bronze equivalent to closed. This means that rather than just assigning Bronze OA as 'Closed', we need to reallocate it to Green and Closed depending on whether AAM/VoR green route is available
+  # Dimensions has a green: submitted category which we would consider closed
+
+merged_pvga$Open.Access_ukri <- merged_pvga$Open.Access
+merged_pvga$Open.Access_ukri[merged_pvga$Open.Access_ukri == "Hybrid"] <- "Hybrid gold" # to avoid confusion with journal type
+merged_pvga$Open.Access_ukri[merged_pvga$Open.Access_ukri == "Bronze" | merged_pvga$Open.Access_ukri == "Green, Submitted" | merged_pvga$Open.Access_ukri == "Closed"] <- "Closed" #since these are all closed from the perspective of UKRI policy
+merged_pvga$Open.Access_ukri[merged_pvga$Open.Access_ukri %in% c("Green, Published", "Green, Accepted") |
+                              (merged_pvga$Open.Access_ukri == "Closed" & !is.na(merged_pvga$upw_green_location))] <- "Green"
 
 # Generate new variables for journal type----
     # NB when using journal_type variable we are looking forward at potential compliance. This means that if journals were not open access when article was published, but are now open access (i.e. listed in DOAJ but Open.Access != Pure Gold) then we should count them as open access. On the other hand there are some journals which are recorded as Pure Gold in Dimensions, but are not listed in DOAJ, but manual checking of 5 of these journals showed them to be either incorrectly labelled as not in DOAJ, or journals which were listed in DOAJ but are now closed. This means it is reasonable to class both listed in DOAJ and Open.Access = Pure Gold as signifying pure gold.
@@ -325,7 +329,9 @@ merged_pvga$ta_split[merged_pvga$Publisher %in% target_tas] <- "target TAs"
 
 # Remove unnecessary variables----
   # (these were mostly metadata not used for analysis or only needed for testing)
-merged_pvga <- subset(merged_pvga, select = -c(issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner, g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions))
+merged_pvga <- subset(merged_pvga,
+                      select = -c(issn_electronic, issn_print, j_title, sherpa_publisher, system_metadata.uri, g_copyright_owner,
+                                  g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions))
 
 #XXXXXXXXXXXXX
 #7. CREATE COMPLIANCE VARIABLES TO INDICATE COMPLIANCE WITH DIFFERENT POLICY SCENARIOS----
@@ -450,7 +456,7 @@ merged_pvga$compliance_new_target_TAs[is.na(merged_pvga$compliance_new_target_TA
 
   # Recode Open.Access as factor
 merged_pvga$Open.Access <- factor(merged_pvga$Open.Access, ordered = TRUE, levels = c("Pure Gold", "Hybrid", "Green, Published", "Green, Accepted", "Bronze", "Green, Submitted", "Closed"))
-merged_pvga$Open.Access2 <- factor(merged_pvga$Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))
+merged_pvga$Open.Access_ukri <- factor(merged_pvga$Open.Access_ukri, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))
 
   # Recode g_embargo_zero as a factor
 merged_pvga$g_embargo <- factor(merged_pvga$g_embargo, ordered = TRUE, levels = c(0,3,6,12,18,24,36,48,NA))
@@ -490,7 +496,8 @@ merged_pvga <- merged_pvga[rows, ]
 # 7. SELECTING ONLY VARIABLES USED IN THE ANALYSIS----
 # this only includes variables which are used in the analysis
 merged_pvga <- merged_pvga %>%
-  select(-c(Units.of.Assessment, open_access_prohibited, rank_green, rank_fee, num_current_green, compliance_current2, compliance_new_hybrid2, fee_article_version))
+  select(-c(Units.of.Assessment, open_access_prohibited, rank_green, rank_fee, num_current_green, compliance_current2, compliance_new_hybrid2,
+            fee_article_version, oa_locations, best_oa_location, listed_in_doaj))
 
 
 # 8. WRITE MERGED_PVGA TO EXCEL AND RDA ----

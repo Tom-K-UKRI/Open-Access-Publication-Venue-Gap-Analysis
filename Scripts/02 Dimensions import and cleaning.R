@@ -43,12 +43,6 @@ dimensions$Source.title <- tolower(dimensions$Source.title)
 dimensions <- dimensions %>%
   mutate(Open.Access = gsub("All OA; ", "", Open.Access))
 
-# Recoding Open.Access into simpler form
-dimensions$Open.Access2 <- dimensions$Open.Access
-dimensions$Open.Access2[dimensions$Open.Access2 == "Hybrid"] <- "Hybrid gold" # to avoid confusion with journal type
-dimensions$Open.Access2[dimensions$Open.Access2 == "Green, Published" | dimensions$Open.Access2 == "Green, Accepted"] <- "Green"
-dimensions$Open.Access2[dimensions$Open.Access2 == "Bronze" | dimensions$Open.Access2 == "Green, Submitted" | dimensions$Open.Access2 == "Closed"] <- "Closed" #since these are all closed from the perspective of UKRI policy
-
 # Creating new variable ukri_Funder---- 
   #pulling out the UKRI Funder for each article and cleaning it up (these will later be merged into ukri_Funder and then removed)
 dimensions$AHRC[grepl("Arts and Humanities Research Council|AHRC", dimensions$Funder)] <- "AHRC"
@@ -132,8 +126,24 @@ dimensions$Publisher[dimensions$Publisher == "Springer Nature" & !grepl("nature"
 
 
 # changing column order (this also serves to remove unnecessary columns. If any new columns added they will need to be added here)
-col_order <- (c("Title", "DOI", "Publication.Date", "PubYear", "Source.title", "Publisher", "ISSN", "e.ISSN", "Publication.Type", 'Country.of.Research.organization', "Research.Organizations...standardized", "FOR..ANZSRC..Categories", "for_division", "for_group", "discipline", "Open.Access", "Open.Access2", "Funder", "ukri_funders", "Units.of.Assessment"))
+col_order <- (c("Title", "DOI", "Publication.Date", "PubYear", "Source.title", "Publisher", "ISSN", "e.ISSN", "Publication.Type", 'Country.of.Research.organization', "Research.Organizations...standardized", "FOR..ANZSRC..Categories", "for_division", "for_group", "discipline", "Open.Access", "Funder", "ukri_funders", "Units.of.Assessment"))
 dimensions <- dimensions[, col_order]
 
 openxlsx::write.xlsx(as.data.frame(dimensions), 'Data/Dimensions.xlsx')
 save(dimensions, file = "Data/Dimensions.Rda")
+
+
+# Filter to include only articles from 2017-2020
+dimensions <- dimensions %>%
+  filter(PubYear %in% c(2017, 2018, 2019, 2020))
+
+# Filter to only include articles and proceedings (i.e. to exclude books, chapters, monographs, and preprints)
+dimensions <- dimensions %>%
+  filter(Publication.Type %in% c("Article", "Proceeding"))
+
+# Filter to exclude publications without a journal or issn recorded (this is almost all proceedings)
+dimensions <- dimensions %>%
+  filter(!(is.na(ISSN) & is.na(e.ISSN) & is.na(Source.title)))
+
+save(dimensions, file = "Data/dimensions_filtered.Rda")
+
