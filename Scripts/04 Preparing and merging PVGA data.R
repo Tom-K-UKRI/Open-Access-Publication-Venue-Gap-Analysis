@@ -296,7 +296,7 @@ merged_pvga$Open.Access_ukri <- merged_pvga$Open.Access
 merged_pvga$Open.Access_ukri[merged_pvga$Open.Access_ukri == "Hybrid"] <- "Hybrid gold" # to avoid confusion with journal type
 merged_pvga$Open.Access_ukri[merged_pvga$Open.Access_ukri == "Bronze" | merged_pvga$Open.Access_ukri == "Green, Submitted" | merged_pvga$Open.Access_ukri == "Closed"] <- "Closed" #since these are all closed from the perspective of UKRI policy
 merged_pvga$Open.Access_ukri[merged_pvga$Open.Access_ukri %in% c("Green, Published", "Green, Accepted") |
-                              (merged_pvga$Open.Access_ukri == "Closed" & !is.na(merged_pvga$upw_green_location))] <- "Green"
+                              (merged_pvga$Open.Access_ukri == "Closed" & !is.na(merged_pvga$upw_green_version))] <- "Green"
 
 # Generate new variables for journal type----
     # NB when using journal_type variable we are looking forward at potential compliance. This means that if journals were not open access when article was published, but are now open access (i.e. listed in DOAJ but Open.Access != Pure Gold) then we should count them as open access. On the other hand there are some journals which are recorded as Pure Gold in Dimensions, but are not listed in DOAJ, but manual checking of 5 of these journals showed them to be either incorrectly labelled as not in DOAJ, or journals which were listed in DOAJ but are now closed. This means it is reasonable to class both listed in DOAJ and Open.Access = Pure Gold as signifying pure gold.
@@ -497,7 +497,7 @@ merged_pvga <- merged_pvga[rows, ]
 # this only includes variables which are used in the analysis
 merged_pvga <- merged_pvga %>%
   select(-c(Units.of.Assessment, open_access_prohibited, rank_green, rank_fee, num_current_green, compliance_current2, compliance_new_hybrid2,
-            fee_article_version, oa_locations, best_oa_location, listed_in_doaj))
+            fee_article_version, listed_in_doaj, best_oa_status_upw, journal_is_oa, journal_is_in_doaj))
 
 
 # 8. WRITE MERGED_PVGA TO EXCEL AND RDA ----

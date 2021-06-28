@@ -4,7 +4,7 @@
 
 # NB. This only includes analysis which was used in the report - for other analysis (e.g. at a journal level) see superceded code 'PVGA Analysis - in report order'
 
-# NB.2  see documentation for description of dervied variables used in analysis below
+# NB.2  see documentation for description of derived variables used in analysis below
 
 #XXXXXXXXXXXXXXX
 # Clear work space
@@ -199,6 +199,42 @@ Open.Access_a <- merged_pvga %>% # article level
 
 openxlsx::write.xlsx(as.data.frame(Open.Access_a), 'Output/Tables/Open.Access.xlsx')
 
+# Proportion of all articles available green OA
+Repository_versions <- merged_pvga %>%
+  rowwise() %>%
+  mutate(has_green = !is.na(upw_green_version)) %>%
+  ungroup() %>%
+  group_by(Open.Access_ukri, has_green) %>%
+  count() %>%
+  group_by(Open.Access_ukri) %>%
+  mutate(percent = n/sum(n)*100)
+
+# Licenses for green OA articles from Unpaywall----
+
+  # needs a bit of cleaning first
+merged_pvga$upw_green_licence[merged_pvga$upw_green_licence %in% c("pd", "No green license found")] <- NA
+merged_pvga$upw_green_licence[merged_pvga$upw_green_licence %in% c("cc0")] <- "cc-by"
+merged_pvga$upw_green_licence[merged_pvga$upw_green_licence %in% c("elsevier-specific: oa user license", "acs-specific: authorchoice/editors choice usage agreement")] <- "implied-oa"
+
+all_green_licences_upw <- merged_pvga %>%
+  filter(!is.na(upw_green_version)) %>%
+  count(upw_green_licence) %>%
+  mutate(percent_all_inc_w_gold = n/sum(n)*100) %>%
+  rename(n_all_inc_w_gold = n)
+
+green_licences_green_only_upw <- merged_pvga %>%
+  filter(Open.Access_ukri == "Green") %>%
+  count(upw_green_licence) %>%
+  mutate(percent_only_green_route = n/sum(n)*100) %>%
+  rename(n_only_green_route = n)
+
+green_licences <- bind_cols(all_green_licences_upw, green_licences_green_only_upw) %>%
+  mutate(upw_green_license = factor(upw_green_licence...1, levels=c("cc-by", "cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "implied-oa"), ordered = TRUE)) %>%
+  select(-upw_green_licence...4) %>%
+  arrange(upw_green_license)
+
+openxlsx::write.xlsx(as.data.frame(green_licences), 'Output/Tables/green_licenses_upw.xlsx')
+
 
 # Actual Open Access x Discipline ----
 
@@ -259,7 +295,8 @@ Open.Access_a_uni <- universities %>%
             green = percent[Open.Access_ukri == "Green"],
             compliant = sum(percent[Open.Access_ukri %in% c("Pure Gold", "Hybrid gold", "Green")])) %>%
   arrange(desc(group_size), uni) %>%
-  mutate(proportion_all_articles = group_size/sum(group_size)*100)
+  mutate(proportion_all_articles = group_size/sum(group_size)*100) %>%
+  filter(group_size > 39)
 
 openxlsx::write.xlsx(as.data.frame(Open.Access_a_uni), 'Output/Tables/Open.Access_a_uni.xlsx')
 
