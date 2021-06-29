@@ -42,16 +42,20 @@ save(unpaywall, file = "Data/Raw data/unpaywall.RData")
 # Derive green OA variable
   # Essentially this code creates a new row for every oa location recorded in unpaywall, then filters to only include ones which have a green VoR or AAM, then ranks them so that published versions come first, then keeps only the first version for each DOI/ article.
   # This means we end up with 1 row for each article with a green AAM/VoR, with VoR selected over AAM. The upw_green variable therefore means that at least the AAM is available in a repository.
+  # NB. Our definition of the best green location differs from Unpaywall's as we prioritise a compliant license over the version (compliant licence AAM better than non-compliant licence VoR)
+
+
 unpaywall_green <- unpaywall %>%
   filter(host_type == "repository" & grepl("publishedVersion|acceptedVersion", version)) %>%
   mutate(licence_order = ifelse(license %in% c("cc-by", "cc0"), 1,
                                 ifelse(license == "cc-by-sa", 2,
-                                ifelse(license == "cc-by-nd", 3,
-                                ifelse(license == "cc-by-nc", 4,
-                                ifelse(license == "cc-by-nc-sa", 5,
-                                ifelse(license == "cc-by-nc-nd", 6,
-                                ifelse(!is.na(license), 7, 8)))))))) %>%
-  arrange(desc(version), desc(is_best), licence_order) %>%
+                                       ifelse(license == "cc-by-nd", 3,
+                                              ifelse(license == "cc-by-nc", 4,
+                                                     ifelse(license == "cc-by-nc-sa", 5,
+                                                            ifelse(license == "cc-by-nc-nd", 6,
+                                                                   ifelse(!is.na(license), 7, 8)))))))) %>%
+  mutate(compliant_licence = ifelse(licence_order %in% c(1:4), "Compliant", "Not compliant")) %>%
+  arrange(compliant_licence, desc(version), desc(is_best), licence_order) %>%
   distinct(doi, .keep_all = TRUE) %>%
   rename(upw_green_licence = license, upw_green_version = version) %>%
   select(doi, title, url, evidence, upw_green_licence, upw_green_version, host_type, is_best, oa_status)
