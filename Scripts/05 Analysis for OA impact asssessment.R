@@ -235,6 +235,19 @@ green_licences <- bind_cols(all_green_licences_upw, green_licences_green_only_up
 
 openxlsx::write.xlsx(as.data.frame(green_licences), 'Output/Tables/green_licenses_upw.xlsx')
 
+# Licences for gold OA from unpaywall----
+merged_pvga$upw_gold_licence[merged_pvga$upw_gold_licence %in% c("acs-specific: authorchoice/editors choice usage agreement",
+"elsevier-specific: oa user license", "implied-oa", "publisher-specific license", "pd")] <- "Other OA licence"
+
+gold_licences_upw <- merged_pvga %>%
+  filter(Open.Access_ukri %in% c("Pure Gold", "Hybrid gold")) %>%
+  mutate(upw_gold_licence = factor(upw_gold_licence, levels = c("cc-by", "cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "Other OA licence"),
+         ordered = TRUE)) %>%
+  count(upw_gold_licence) %>%
+  mutate(percent = n/sum(n)*100)
+
+openxlsx::write.xlsx(as.data.frame(gold_licences_upw), 'Output/Tables/gold_licenses_upw.xlsx')
+
 
 # Actual Open Access x Discipline ----
 
