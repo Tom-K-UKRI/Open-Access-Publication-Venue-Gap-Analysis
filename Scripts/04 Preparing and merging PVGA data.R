@@ -160,7 +160,7 @@ sherpa$copyright <- ifelse(sherpa$copyright_owner %in% c("authors", "authors_ins
 
   # Select only policies where green OA is relevant (additional_oa_fee = no). I originally also excluded listed_in_doaj here (DOAJ is a listing of gold OA journals) but then realised that they many pure gold journals still do have green OA policies (this is presumably why they are in sherpa - in fact almost none of the listed_in_doaj policies are associated with a fee). Also remove policies relating to submitted articles (these aren't peer reviewed)
 sherpa_green <- sherpa %>%
-  filter(additional_oa_fee == "no", article_version != "submitted")
+  filter(additional_oa_fee == "no", article_version != "submitted", location.location != "this_journal")
 
   #Create green_ranking which will be used to select the most permissive green policy for each journal
 

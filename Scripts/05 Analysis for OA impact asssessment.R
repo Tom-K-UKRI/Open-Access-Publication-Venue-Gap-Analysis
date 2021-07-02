@@ -47,14 +47,14 @@ theme_update(text= element_text(family="arial", size=12),
 
 # LIMITATIONS----
 
-# Breakdown of license information 
+# Breakdown of license information ----
 
   # for green policies (excluding Pure Gold since we believe that these are not green policies per se)
 all_green_licenses_exc_pure <- merged_pvga %>%
   filter(!is.na(g_license_single), journal_type != "Pure Gold") %>%
   count(g_license_single, .drop = FALSE) %>%
   mutate(percent = round(n / sum(n) * 100,1)) %>%
-  mutate(g_license_single = factor(g_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
+  mutate(g_license_single = factor(g_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_sa", "cc_by_nd", "cc_by_nc", "cc_by_nc_sa", "cc_by_nc_nd", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
   arrange(g_license_single) %>%
   adorn_totals("row")
 
@@ -63,7 +63,7 @@ all_fee_licenses <- merged_pvga %>%
   filter(!is.na(fee_license_single)) %>%
   count(fee_license_single, .drop = FALSE) %>%
   mutate(percent = round(n / sum(n) * 100,1)) %>%
-  mutate(fee_license_single = factor(fee_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
+  mutate(fee_license_single = factor(fee_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_sa", "cc_by_nd", "cc_by_nc", "cc_by_nc_sa", "cc_by_nc_nd", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
   arrange(fee_license_single) %>%
   adorn_totals("row")
 
@@ -234,6 +234,19 @@ green_licences <- bind_cols(all_green_licences_upw, green_licences_green_only_up
   arrange(upw_green_license)
 
 openxlsx::write.xlsx(as.data.frame(green_licences), 'Output/Tables/green_licenses_upw.xlsx')
+
+# Licences for gold OA from unpaywall----
+merged_pvga$upw_gold_licence[merged_pvga$upw_gold_licence %in% c("acs-specific: authorchoice/editors choice usage agreement",
+"elsevier-specific: oa user license", "implied-oa", "publisher-specific license", "pd")] <- "Other OA licence"
+
+gold_licences_upw <- merged_pvga %>%
+  filter(Open.Access_ukri %in% c("Pure Gold", "Hybrid gold")) %>%
+  mutate(upw_gold_licence = factor(upw_gold_licence, levels = c("cc-by", "cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "Other OA licence"),
+         ordered = TRUE)) %>%
+  count(upw_gold_licence) %>%
+  mutate(percent = n/sum(n)*100)
+
+openxlsx::write.xlsx(as.data.frame(gold_licences_upw), 'Output/Tables/gold_licenses_upw.xlsx')
 
 
 # Actual Open Access x Discipline ----
@@ -642,8 +655,7 @@ missing_publisher_info <- bind_rows(merged_pvga %>% filter(grepl("Arts", discipl
 
 # Simple breakdown of green compliance
 simple_green <- merged_pvga %>% 
-  filter(journal_type != "Pure Gold") %>%
-  group_by(g_license_cc_by, g_embargo3) %>% 
+  group_by(g_license_cc_by, g_embargo_zero) %>% 
   count() %>%
   ungroup() %>%
   mutate(percent = round(n / sum(n) * 100,1))
