@@ -195,8 +195,10 @@ sherpa_green_1row <- sherpa_green_1row %>%
       #additional_oa_fee = yes or 
       #it's published only version of a pure gold journal (listed_in_doaj is helpful because DOAJ is a listing of pure gold journal) (this is assuming that quite a lot of pure gold policies are not associated with an additional fee because there is always a standard fee for publishing in that journal) or,
       # Article version is submitted or accepted only (there are some policies associated with a fee for accepted/ submitted versions but these can not be compliant and may be errors - I left in ones that also have published version). 
-sherpa_fee <- sherpa %>%
-  filter((additional_oa_fee == "yes" | (listed_in_doaj == "yes" & article_version == "published")) & article_version != "submitted" & article_version != "accepted" & article_version != "submitted, accepted")
+sherpa_fee <- sherpa %>% mutate(unique_id = 1:nrow(sherpa)) %>%
+  filter((additional_oa_fee == "yes" | (listed_in_doaj == "yes" & grepl("published", article_version)) | (article_version == "published" & location.location == "this_journal")) &
+           !article_version %in% c("submitted", "accepted", "submitted, accepted") &
+           !embargo.amount > 0)
 
     # Create column 'rank_fee' to rank policies from most to least permissive
 
