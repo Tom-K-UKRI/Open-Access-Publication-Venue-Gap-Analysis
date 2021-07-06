@@ -3,7 +3,7 @@
 # Author: Tom Kenny
 # Created: August 2020
 # Last Updated: March 2021
-# Last ran: 29.03.2021
+# Last ran: 06.07.2021
 
 # Purpose of code: to download information on journals' open access policies from the SHERPA API
 
@@ -43,12 +43,12 @@ for(i in 1:max_api_calls){
 }
 
 # Remove additional pages not filled
-#pages <- pages[1:317] # if updating replace 317 with final page which has records
+# pages <- pages[1:322] # if updating replace 322 with final page which has records
 
 # Combining queries into a single JSON file and saving out as .Rda
 message("Combining queries")
 publications <- rbind_pages(pages)
-save(publications, file = "Data/Raw data/sherpa_publications_json.Rda") # TK: to preserve this since download takes so long
+save(publications, file = "Data/Raw data/sherpa_publications_json.Rda") # TK: preserve this since download takes so long ()
 
 #XXXXXXXXXXXXXXXXXXX
 

@@ -505,7 +505,7 @@ merged_pvga <- merged_pvga %>%
 # 8. WRITE MERGED_PVGA TO EXCEL AND RDA ----
 
 openxlsx::write.xlsx(as.data.frame(merged_pvga), 'Data/merged_pvga.xlsx')
-write_tsv(merged_pvga[1:1000,], file = "Data/merged_pvga_1000.tsv")
+write_tsv(merged_pvga, file = "Data/merged_pvga.tsv")
 save(merged_pvga, file = "Data/merged_pvga.Rda")
 
 # Merged PVGA: We have a Sherpa link for 97.5% of the publications in the Dimensions sample. We have green (no fee) routes for almost all of these and paid (fee) routes for about three-fifths.
