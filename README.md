@@ -20,7 +20,7 @@ The first three scripts download and clean the data ready for filtering, merging
 
 2 Dimensions import and cleaning: This code imports Dimensions data and cleans it. The data was downloaded for us by Katie Shamash at Dimensions as this is the easiest option, but it could also be downloaded using the Dimensions API (see code for doing this in superceded folder). Once the data is imported, the code gets rid of duplicates, cleans variables, derives new variables, then saves it out as .xlsx and .Rda.
 
-3. Unpaywall import and cleaning to provide green OA data: This code uses Unpaywall API to download unpaywall OA routes for the DOIs in the Dimensions sample. It then identifies the most permissive green and gold routes to OA for each where they exist. It prioritises according to the UKRI policy (rather than Dimensions own assessment of best_oa_location) and identifies a green and gold route where both exist
+3. Unpaywall API and cleaning: This code uses Unpaywall API to download unpaywall OA routes for the DOIs in the Dimensions sample. It then identifies the most permissive green and gold routes to OA for each where they exist. It prioritises according to the UKRI policy (rather than Dimensions own assessment of best_oa_location) and identifies a green and gold route where both exist
 
 4. Preparing and merging PVGA data: This data imports previously produced data from Sherpa, Dimensions and Unpaywall, and imports new data from ESAC. It then merges them all together and creates new variables from the merged data, in particular focusing on compliance with various policy scenarios.
 
