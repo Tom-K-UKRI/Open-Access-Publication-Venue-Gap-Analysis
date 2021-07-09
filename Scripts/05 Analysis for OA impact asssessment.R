@@ -4,7 +4,7 @@
 
 # NB. This only includes analysis which was used in the report - for other analysis (e.g. at a journal level) see superceded code 'PVGA Analysis - in report order'
 
-# NB.2  see documentation for description of dervied variables used in analysis below
+# NB.2  see documentation for description of derived variables used in analysis below
 
 #XXXXXXXXXXXXXXX
 # Clear work space
@@ -47,23 +47,23 @@ theme_update(text= element_text(family="arial", size=12),
 
 # LIMITATIONS----
 
-# Breakdown of license information 
+# Breakdown of license information ----
 
   # for green policies (excluding Pure Gold since we believe that these are not green policies per se)
 all_green_licenses_exc_pure <- merged_pvga %>%
   filter(!is.na(g_license_single), journal_type != "Pure Gold") %>%
   count(g_license_single, .drop = FALSE) %>%
   mutate(percent = round(n / sum(n) * 100,1)) %>%
-  mutate(g_license_single = factor(g_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
+  mutate(g_license_single = factor(g_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_sa", "cc_by_nd", "cc_by_nc", "cc_by_nc_sa", "cc_by_nc_nd", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
   arrange(g_license_single) %>%
   adorn_totals("row")
 
-  # for gold policies (excluding Pure Gold since we believe that these are not green policies per se)
+  # for gold policies
 all_fee_licenses <- merged_pvga %>%
   filter(!is.na(fee_license_single)) %>%
   count(fee_license_single, .drop = FALSE) %>%
   mutate(percent = round(n / sum(n) * 100,1)) %>%
-  mutate(fee_license_single = factor(fee_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_nd", "cc_by_sa", "cc_by_nc", "cc_by_nc_nd", "cc_by_nc_sa", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
+  mutate(fee_license_single = factor(fee_license_single, ordered = TRUE, levels = c("cc_by", "cc_by_sa", "cc_by_nd", "cc_by_nc", "cc_by_nc_sa", "cc_by_nc_nd", "bespoke_license", "all_rights_reserved", "no license requirement"))) %>%
   arrange(fee_license_single) %>%
   adorn_totals("row")
 
@@ -72,14 +72,11 @@ all_licenses <- bind_cols(all_green_licenses_exc_pure, all_fee_licenses)
 
 write.xlsx(all_licenses, file = "Output/Tables/All licenses.xlsx")
 
+rm(all_fee_licenses, all_green_licenses_exc_pure)
+
 # IMPACT OF EACH POLICY SCENARIO----
 
 # Ultimately creating a stacked bar chart comparing actual OA, potential compliance with the current policy and all three potential compliance scenarios (current, funding for all, funding for hybrid with TAs, funding for fully OA only).
-
-  # Current OA status - no longer including as doesn't fit
-# Open.Access_a <- merged_pvga %>% # article level
-#   count(Open.Access2) %>%
-#   mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
 
   # Potential compliance with current policy
 compliance_current_a <- merged_pvga %>%
@@ -94,12 +91,12 @@ compliance_h_a <- merged_pvga %>%
   # Potential compliance with Scenario 2
 compliance_new_a <- merged_pvga %>%
   count(compliance_new, .drop = FALSE) %>%
-  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "S2 (only hybrid\ngold w/ TA)\n(current TAs)")
+  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "S2a (only hybrid\ngold w/ TA)\n(current TAs)")
 
 #  # Potential compliance with Scenario 2 (if JISC Target TAs achieved)
 compliance_new_target_TAs_a <- merged_pvga %>%
   count(compliance_new_target_TAs, .drop = FALSE) %>%
-  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "S2 (only hybrid\ngold w/ TA)\n(target TAs)")
+  mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "S2b (only hybrid\ngold w/ TA)\n(target TAs)")
 
   # Potential compliance with Scenario 3
 compliance_new_pure_a <- merged_pvga %>%
@@ -146,11 +143,11 @@ ggsave(policy_impact_a_bar, filename = "Output/Charts/Impact of each policy scen
 # Create summary table to compare scenarios - subset percentages only
 
 Open.Access_a <- merged_pvga %>% # adding current OA back in for table
-  count(Open.Access2) %>%
+  count(Open.Access_ukri) %>%
   mutate(percent = round(n / sum(n) * 100,1), cml = round(cumsum(percent)), Scenario = "Current\n(actual)")
 
 policy_impact_a_table <- bind_rows(Open.Access_a, compliance_current_a, compliance_h_a, compliance_new_a, compliance_new_target_TAs_a, compliance_new_pure_a) %>%
-  unite(Compliance_Route, c('Open.Access2', 'compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
+  unite(Compliance_Route, c('Open.Access_ukri', 'compliance_current', 'compliance_new_hybrid', 'compliance_new', 'compliance_new_target_TAs', 'compliance_new_pure'), na.rm = TRUE) %>%
   relocate(5,1,2,3,4)
 
 # Label each compliance route
@@ -183,21 +180,91 @@ why_unsupported <- merged_pvga %>%
 write.xlsx(why_unsupported, file = "Output/Tables/why unsupported by new policy.xlsx")
 
   # same but for Target TAs in place scenario
-why_unsupported <- merged_pvga %>%
+why_unsupported_target_TAs <- merged_pvga %>%
   filter(compliance_new_target_TAs == "No supported route") %>%
   count(journal_type, fee_license_cc_by, has_ta) %>%
   mutate(percent=round(n/sum(n)*100,2))
 
 # ACTUAL OPEN ACCESS STATUS----
-  # this is using Dimensions variable Open.Access (simplified to Open.Access2 which merges categories to match main UKRI categories)
+  # this is using Dimensions variable Open.Access (simplified to Open.Access_ukri which merges categories to match main UKRI categories)
   # there is a more complex version of this table showing average number of articles per OA type but not used in current version of finding so only including simple version here.
 
 Open.Access_a <- merged_pvga %>% # article level
-  count(Open.Access2) %>%
+  count(Open.Access_ukri) %>%
   mutate(percent = round(n / sum(n) * 100,1)) %>%
   adorn_totals("row")
 
 openxlsx::write.xlsx(as.data.frame(Open.Access_a), 'Output/Tables/Open.Access.xlsx')
+
+# Proportion of all articles available green OA
+Repository_versions <- merged_pvga %>%
+  rowwise() %>%
+  mutate(has_green = !is.na(upw_green_version)) %>%
+  ungroup() %>%
+  group_by(Open.Access_ukri, has_green) %>%
+  count() %>%
+  group_by(Open.Access_ukri) %>%
+  mutate(percent = n/sum(n)*100)
+
+# Licenses for green OA articles from Unpaywall----
+
+  # needs a bit of cleaning first
+merged_pvga$upw_green_licence[merged_pvga$upw_green_licence %in% c("pd", "No green license found")] <- NA
+merged_pvga$upw_green_licence[merged_pvga$upw_green_licence %in% c("cc0")] <- "cc-by"
+merged_pvga$upw_green_licence[merged_pvga$upw_green_licence %in% c("elsevier-specific: oa user license", "acs-specific: authorchoice/editors choice usage agreement")] <- "implied-oa"
+
+all_green_licences_upw <- merged_pvga %>%
+  filter(!is.na(upw_green_version)) %>%
+  count(upw_green_licence) %>%
+  mutate(percent_all_inc_w_gold = n/sum(n)*100) %>%
+  rename(n_all_inc_w_gold = n)
+
+green_licences_green_only_upw <- merged_pvga %>%
+  filter(Open.Access_ukri == "Green") %>%
+  count(upw_green_licence) %>%
+  mutate(percent_only_green_route = n/sum(n)*100) %>%
+  rename(n_only_green_route = n)
+
+green_licences <- bind_cols(all_green_licences_upw, green_licences_green_only_upw) %>%
+  mutate(upw_green_license = factor(upw_green_licence...1, levels=c("cc-by", "cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "implied-oa"), ordered = TRUE)) %>%
+  select(-upw_green_licence...4) %>%
+  arrange(upw_green_license)
+
+openxlsx::write.xlsx(as.data.frame(green_licences), 'Output/Tables/green_licenses_upw.xlsx')
+
+# Licences for gold OA from unpaywall----
+merged_pvga$upw_gold_licence[merged_pvga$upw_gold_licence %in% c("acs-specific: authorchoice/editors choice usage agreement",
+"elsevier-specific: oa user license", "implied-oa", "publisher-specific license", "pd")] <- "Other OA licence"
+
+<<<<<<< HEAD
+gold_licences_upw_all <- merged_pvga %>%
+=======
+gold_licences_upw <- merged_pvga %>%
+>>>>>>> 32b4db98d7cc7a060abdcae2fbdb7449c7c31d08
+  filter(Open.Access_ukri %in% c("Pure Gold", "Hybrid gold")) %>%
+  mutate(upw_gold_licence = factor(upw_gold_licence, levels = c("cc-by", "cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "Other OA licence"),
+         ordered = TRUE)) %>%
+  count(upw_gold_licence) %>%
+  mutate(percent = n/sum(n)*100)
+
+<<<<<<< HEAD
+gold_licences_upw_journal_type <- merged_pvga %>%
+  filter(Open.Access_ukri %in% c("Pure Gold", "Hybrid gold")) %>%
+  mutate(upw_gold_licence = factor(upw_gold_licence, levels = c("cc-by", "cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd", "Other OA licence"),
+                                   ordered = TRUE)) %>%
+  group_by(journal_type) %>%
+  count(upw_gold_licence) %>%
+  mutate(percent = n/sum(n)*100) %>%
+  pivot_wider(names_from = journal_type, values_from = (c(n, percent)))
+
+gold_licenses_all_and_journal_type <- gold_licences_upw_all %>%
+  left_join(gold_licences_upw_journal_type, by = "upw_gold_licence") %>%
+  relocate(upw_gold_licence, n, percent, `n_Pure Gold`, `percent_Pure Gold`, n_Hybrid, percent_Hybrid)
+
+openxlsx::write.xlsx(as.data.frame(gold_licenses_all_and_journal_type), 'Output/Tables/gold_licenses_upw.xlsx')
+=======
+openxlsx::write.xlsx(as.data.frame(gold_licences_upw), 'Output/Tables/gold_licenses_upw.xlsx')
+>>>>>>> 32b4db98d7cc7a060abdcae2fbdb7449c7c31d08
 
 
 # Actual Open Access x Discipline ----
@@ -209,20 +276,18 @@ disciplines <- merged_pvga %>%
 Open.Access_a_disc <- disciplines %>%
   filter(!is.na(disc)) %>%
   group_by(disc) %>%
-  count(Open.Access2, .drop = FALSE) %>%
+  count(Open.Access_ukri, .drop = FALSE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
   mutate(cml = round(cumsum(percent),1)) %>%
   mutate(percent = round(percent, 1)) %>%
   mutate(disc = factor(disc, ordered = TRUE, levels = c("Arts & Humanities", "Health Sciences", "Life Sciences", "Physical Sciences", "Social Sciences", "Missing")), 
-         Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
-  arrange(disc, Open.Access2)
-
-openxlsx::write.xlsx(as.data.frame(Open.Access_a_disc), 'Output/Tables/Open.Access_a_disc.xlsx')
+         Open.Access_ukri = factor(Open.Access_ukri, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
+  arrange(disc, Open.Access_ukri)
 
 # Bar
 Open.Access_a_disc_bar <- Open.Access_a_disc %>%
   ggplot(aes(x=disc, y=percent)) +
-  geom_bar(aes(fill=Open.Access2), stat = "identity", position = "stack", width = 0.9) +
+  geom_bar(aes(fill=Open.Access_ukri), stat = "identity", position = "stack", width = 0.9) +
   scale_fill_manual(values = c("#F08900", "#FBBB10", "#16978A", "#FF5A5A"), name = "Open Access Category", labels = c("Gold OA in fully\nOA journal\n", "Gold OA in Hybrid\njournal\n", "Green OA (Version\nof Record or Author\nAccepted Manuscript", "\nNo OA version identified\n")) +
   # ggtitle("Open Access Categories by discipline") +
   theme(axis.title.x = element_text(face="bold", size=16, margin = margin(t=10)),
@@ -236,6 +301,56 @@ Open.Access_a_disc_bar <- Open.Access_a_disc %>%
 
 ggsave(Open.Access_a_disc_bar, filename = "Output/Charts/Open.Access_a_disc_bar.png", width = 9, height = 5, dpi = 300)
 
+# Repository versions by discipline (including those with gold OA version)----
+disciplines <- merged_pvga %>% 
+  separate(discipline, into = c("disc1", "disc2", "disc3", "disc4"), sep = "; ") %>%
+  pivot_longer(c(disc1, disc2, disc3, disc4), names_to = "disc_all", values_to ="disc")
+
+Repo_versions_a_disc <- disciplines %>%
+  filter(!is.na(disc)) %>%
+  group_by(disc, upw_green_version) %>%
+  count() %>%
+  mutate(disc = factor(disc, ordered = TRUE, levels = c("Arts & Humanities", "Health Sciences", "Life Sciences", "Physical Sciences", "Social Sciences", "Missing"))) %>%
+  group_by(disc) %>%
+  mutate(percent = n/sum(n)*100) %>%
+  arrange(disc) %>%
+  pivot_wider(names_from = upw_green_version, values_from = c(n, percent)) %>%
+  rowwise() %>%
+  mutate(all_repo_versions_n = n_acceptedVersion + n_publishedVersion, all_repo_versions_percent = percent_acceptedVersion + percent_publishedVersion) %>%
+  select(disc, all_repo_versions_n, all_repo_versions_percent)
+
+# Merging current OA status tables for report----
+Open.Access_and_repositories <- Open.Access_a_disc %>%
+  select(-cml, -n) %>%
+  pivot_wider(names_from = Open.Access_ukri, values_from = percent) %>%
+  left_join(Repo_versions_a_disc, by = "disc") %>%
+  left_join(disciplines %>%
+              filter(!is.na(disc)) %>%
+              mutate(disc = factor(disc, ordered = TRUE, levels = c("Arts & Humanities", "Health Sciences", "Life Sciences", "Physical Sciences", "Social Sciences", "Missing"))) %>%
+              count(disc) %>% rename(n_all_disc = n)) %>%
+  select(disc, n_all_disc, `Pure Gold`, `Hybrid gold`, Green, Closed, all_repo_versions_percent)
+
+openxlsx::write.xlsx(as.data.frame(Open.Access_and_repositories), 'Output/Tables/Open.Access_and_repositories.xlsx')
+
+
+#  Actual open access x publisher----
+top_publishers_oac <- merged_pvga %>%
+  group_by(Publisher) %>%
+  count(Open.Access_ukri) %>%
+  pivot_wider(names_from = Open.Access_ukri, values_from = n) %>%
+  adorn_totals("col") %>%
+  rename(pure_gold = "Pure Gold", hybrid_gold = "Hybrid gold") %>%
+  mutate(pure_percent = round(pure_gold/Total*100,1), hybrid_gold_percent = round(hybrid_gold/Total*100,1), green_percent = round(Green/Total*100,1), closed_percent = round(Closed/Total*100,1)) %>%
+  select(-c(2,3,4,5)) %>%
+  rename(Total_n_articles = Total) %>%
+  mutate(percent_of_total_articles = round(Total_n_articles/sum(Total_n_articles)*100,1)) %>%
+  arrange(desc(Total_n_articles)) %>%
+  mutate(cml = round(cumsum(percent_of_total_articles),0)) %>%
+  relocate(1,2,7,8,3,4,5,6) %>%
+  adorn_totals("row")
+
+openxlsx::write.xlsx(as.data.frame(top_publishers_oac), 'Output/Tables/top_publishers_oac.xlsx')
+
 
 # Actual open access x research organisation----
 universities <- merged_pvga %>% 
@@ -247,19 +362,20 @@ universities <- merged_pvga %>%
 
 Open.Access_a_uni <- universities %>%
   filter(!is.na(uni)) %>%
-  mutate(Open.Access2 = factor(Open.Access2, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
+  mutate(Open.Access_ukri = factor(Open.Access_ukri, ordered = TRUE, levels = c("Pure Gold", "Hybrid gold", "Green", "Closed"))) %>% # this is needed to get everything in correct order
   group_by(uni) %>%
-  count(Open.Access2, .drop = FALSE) %>%
+  count(Open.Access_ukri, .drop = FALSE) %>%
   mutate(percent = (n / sum(n)) * 100) %>%
   mutate(cml = round(cumsum(percent),1)) %>%
   mutate(percent = round(percent, 1)) %>%
   group_by(uni) %>%
   summarise(group_size = sum(n),
-            gold = sum(percent[Open.Access2 %in% c("Pure Gold", "Hybrid gold")]),
-            green = percent[Open.Access2 == "Green"],
-            compliant = sum(percent[Open.Access2 %in% c("Pure Gold", "Hybrid gold", "Green")])) %>%
+            gold = sum(percent[Open.Access_ukri %in% c("Pure Gold", "Hybrid gold")]),
+            green = percent[Open.Access_ukri == "Green"],
+            compliant = sum(percent[Open.Access_ukri %in% c("Pure Gold", "Hybrid gold", "Green")])) %>%
   arrange(desc(group_size), uni) %>%
-  mutate(proportion_all_articles = group_size/sum(group_size)*100)
+  mutate(proportion_all_articles = group_size/sum(group_size)*100) %>%
+  filter(group_size > 39)
 
 openxlsx::write.xlsx(as.data.frame(Open.Access_a_uni), 'Output/Tables/Open.Access_a_uni.xlsx')
 
@@ -322,7 +438,19 @@ compliance_new_ukri_funder_ta <- bind_rows(compliance_new_ukri_funder_ta, compli
 compliance_new_ukri_funder_ta[12,'ukri_funder'] <- "All articles"
 
 openxlsx::write.xlsx(as.data.frame(compliance_new_ukri_funder_ta), 'Output/Tables/compliance_new_ukri_funder_ta.xlsx')
-rm(compliance_new_ukri_funder, compliance_all_articles, ta_all_hybrid, TA_ukri_funder, ukri_funders)
+rm(compliance_new_ukri_funder, compliance_all_articles, ta_all_hybrid, TA_ukri_funder)
+
+
+# Work it out with TA targets in place
+compliance_new_ukri_funder_target_TAs <- ukri_funders  %>%
+  filter(!is.na(ukri_funder)) %>% 
+  group_by(ukri_funder) %>%
+  count(compliance_new_target_TAs) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
+  mutate(total_n = sum(n))
+
+rm(ukri_funders)
+
 
 # 2. Variation by discipline ----
 
@@ -340,12 +468,29 @@ compliance_new_disc <- disciplines %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
   rename(total_n = "total_n_c: pure gold") %>%
-  select(-c(7,8,9,10)) %>%
+  select(-c(7,8,9)) %>%
   relocate(1,6)
 
 compliance_new_disc$disc[is.na(compliance_new_disc$disc)] <- "Missing"
 
-  # what does it look like with target TAs in place?
+    # Add column to show proportion of each division covered by TA
+TA_disc <- disciplines %>%
+  filter(!is.na(disc), journal_type == "Hybrid") %>%
+  group_by(disc) %>%
+  count(has_ta, .drop = FALSE) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
+  filter(has_ta == "yes")
+
+    # Merge in with compliance_new_disc to add TA column
+compliance_new_disc_ta <- left_join(compliance_new_disc, TA_disc, by = "disc") %>%
+  select(-c(has_ta, n)) %>%
+  rename(percent_hybrid_with_TA = percent) %>%
+  relocate(disc, total_supported, `percent_c: pure gold`,	`percent_c: hybrid gold with a TA`,	`percent_c: confirmed green oa`,	`percent_not compliant`
+           , total_n, percent_hybrid_with_TA)
+
+openxlsx::write.xlsx(as.data.frame(compliance_new_disc_ta), 'Output/Tables/compliance_new_disc_ta.xlsx')
+
+# what does it look like with target TAs in place?
 compliance_new_disc_target_TAs <- disciplines %>%
   filter(!is.na(disc)) %>%
   group_by(disc) %>%
@@ -360,25 +505,6 @@ compliance_new_disc_target_TAs <- disciplines %>%
   relocate(1,6)
 
 compliance_new_disc$disc[is.na(compliance_new_disc$disc)] <- "Missing"
-
-    # Add column to show proportion of each division covered by TA
-TA_disc <- disciplines %>%
-  filter(!is.na(disc), journal_type == "Hybrid") %>%
-  group_by(disc) %>%
-  count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100,1)) %>%
-  filter(has_ta == "yes")
-
-    # Merge in with compliance_new_disc to add TA column
-compliance_new_disc_ta <- bind_cols(compliance_new_disc, TA_disc) %>%
-  select(-c(7,8,9)) %>%
-  rename(percent_hybrid_with_TA = percent)
-  
-# Merge in with compliance_new_disc_ta to create final table
-compliance_new_disc_ta <- bind_rows(compliance_new_disc_ta, compliance_ta_all_articles)
-compliance_new_disc_ta[7,'disc'] <- "All articles"
-
-openxlsx::write.xlsx(as.data.frame(compliance_new_disc_ta), 'Output/Tables/compliance_new_disc_ta.xlsx')
 
     # Stacked bar chart for Compliance by discipline
 compliance_new_disc_a <- disciplines %>%
@@ -427,13 +553,33 @@ compliance_new_division <- divisions %>%
   select(-n) %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_No supported route`), na.rm = TRUE) %>%
+  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_not compliant`), na.rm = TRUE) %>%
   mutate(total_n = gsub(".*_", "", total_n)) %>%
   relocate(division,total_n)
 
 compliance_new_division$division[is.na(compliance_new_division$division)] <- "Missing"
 
-  #what does it look like with target TAs?
+
+      # Add column to show proportion of each division covered by TA
+
+TA_div <- divisions %>%
+  filter(!is.na(division), journal_type == "Hybrid") %>%
+  group_by(division) %>%
+  count(has_ta, .drop = FALSE) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
+  filter(has_ta == "yes")
+
+  # Merge in with compliance_new_division
+compliance_new_division_ta <- bind_cols(compliance_new_division, TA_div) %>%
+  select(-c(division...8,has_ta, n)) %>%
+  rename(percent_hybrid_with_TA = percent) %>%
+  relocate(division...1, total_supported, `percent_c: pure gold`,	`percent_c: hybrid gold with a TA`,	`percent_c: confirmed green oa`,	`percent_not compliant`
+           , total_n, percent_hybrid_with_TA)
+
+openxlsx::write.xlsx(as.data.frame(compliance_new_division_ta), 'Output/Tables/compliance_new_division_ta.xlsx')
+
+
+#what does it look like with target TAs?
 
 compliance_new_division_target_TAs <- divisions %>%
   filter(!is.na(division)) %>%
@@ -450,28 +596,6 @@ compliance_new_division_target_TAs <- divisions %>%
 
 compliance_new_division_target_TAs$division[is.na(compliance_new_division_target_TAs$division)] <- "Missing"
 
-
-      # Add column to show proportion of each division covered by TA
-
-TA_div <- divisions %>%
-  filter(!is.na(division), journal_type == "Hybrid") %>%
-  group_by(division) %>%
-  count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100,1)) %>%
-  filter(has_ta == "yes")
-
-  # Merge in with compliance_new_division
-compliance_new_division_ta <- bind_cols(compliance_new_division, TA_div) %>%
-  select(-c(8,9,10)) %>%
-  rename(percent_hybrid_with_TA = percent)
-
-# Merge in with all articles row to create final table
-compliance_new_division_ta <- bind_rows(compliance_new_division_ta, compliance_ta_all_articles)
-compliance_new_division_ta[24,'division'] <- "All articles"
-
-openxlsx::write.xlsx(as.data.frame(compliance_new_division_ta), 'Output/Tables/compliance_new_division_ta.xlsx')
-
-
 # 3. Variation by Fields of Research Group (i.e. specialism)----
 groups <- merged_pvga %>% 
   separate(for_group, into = c("group1", "group2", "group3", "group4"), sep = "; ") %>%
@@ -486,13 +610,32 @@ compliance_new_group <- groups %>%
   select(-n) %>%
   pivot_wider(names_from = compliance_new, values_from = c(percent, total_n)) %>%
   mutate(total_supported = sum(across(1:3), na.rm = TRUE)) %>% # I couldn't get rowsum to work - for some weird reason this code seems to requires 0 indexing of columns (i.e. I'm adding columns 2:4 in this line)
-  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_No supported route`), na.rm = TRUE) %>%
+  unite(total_n, c(`total_n_c: pure gold`, `total_n_c: hybrid gold with a TA`, `total_n_c: confirmed green oa`, `total_n_not compliant`), na.rm = TRUE) %>%
   mutate(total_n = gsub(".*_", "", total_n)) %>%
   relocate(group,total_n)
 
 compliance_new_group$group[is.na(compliance_new_group$group)] <- "Missing"
 
-    # what does it look like with Jisc target TAs in place?
+    # Proportion of specialisms covered by TAs
+TA_group <- groups %>%
+  mutate(has_ta = factor(has_ta)) %>% # this is needed to stop specialisms with 0% TA coverage being dropped
+  filter(!is.na(group), journal_type == "Hybrid") %>%
+  group_by(group) %>%
+  count(has_ta, .drop = FALSE) %>%
+  mutate(percent = round(n/sum(n)*100,1)) %>%
+  filter(has_ta == "yes")
+
+# Merge in with compliance_new_group
+compliance_new_group_ta <- bind_cols(compliance_new_group, TA_group) %>%
+  select(-c(group...8, has_ta, n)) %>%
+  rename(percent_hybrid_with_TA =percent) %>%
+  relocate(group...1, total_supported, `percent_c: pure gold`,	`percent_c: hybrid gold with a TA`,	`percent_c: confirmed green oa`,	`percent_not compliant`
+           , total_n, percent_hybrid_with_TA)
+
+openxlsx::write.xlsx(as.data.frame(compliance_new_group_ta), 'Output/Tables/compliance_new_group_ta.xlsx')
+
+
+# what does it look like with Jisc target TAs in place?
 compliance_new_group_target_TAs <- groups %>%
   filter(!is.na(group)) %>%
   group_by(group) %>%
@@ -508,49 +651,10 @@ compliance_new_group_target_TAs <- groups %>%
 
 compliance_new_group_target_TAs$group[is.na(compliance_new_group_target_TAs$group)] <- "Missing"
 
-    # Proportion of specialisms covered by TAs
-TA_group <- groups %>%
-  mutate(has_ta = factor(has_ta)) %>% # this is needed to stop specialisms with 0% TA coverage being dropped
-  filter(!is.na(group), journal_type == "Hybrid") %>%
-  group_by(group) %>%
-  count(has_ta, .drop = FALSE) %>%
-  mutate(percent = round(n/sum(n)*100,1)) %>%
-  filter(has_ta == "yes")
-
-# Merge in with compliance_new_group
-compliance_new_group_ta <- bind_cols(compliance_new_group, TA_group) %>%
-  select(-c(8,9,10)) %>%
-  rename(percent_hybrid_with_TA =percent)
-
-# Merge in with all articles row to create final table
-compliance_new_group_ta <- bind_rows(compliance_new_group_ta, compliance_ta_all_articles)
-compliance_new_group_ta[154,'group'] <- "All articles"
-
-openxlsx::write.xlsx(as.data.frame(compliance_new_group_ta), 'Output/Tables/compliance_new_group_ta.xlsx')
-
-
 # 4. Variation by Publisher----
 
-#  Top Publishers and oac
-top_publishers_oac <- merged_pvga %>%
-  group_by(Publisher) %>%
-  count(Open.Access2) %>%
-  pivot_wider(names_from = Open.Access2, values_from = n) %>%
-  adorn_totals("col") %>%
-  rename(pure_gold = "Pure Gold", hybrid_gold = "Hybrid gold") %>%
-  mutate(pure_percent = round(pure_gold/Total*100,1), hybrid_gold_percent = round(hybrid_gold/Total*100,1), green_percent = round(Green/Total*100,1), closed_percent = round(Closed/Total*100,1)) %>%
-  select(-c(2,3,4,5)) %>%
-  rename(Total_n_articles = Total) %>%
-  mutate(percent_of_total_articles = round(Total_n_articles/sum(Total_n_articles)*100,1)) %>%
-  arrange(desc(Total_n_articles)) %>%
-  mutate(cml = round(cumsum(percent_of_total_articles),0)) %>%
-  relocate(1,2,7,8,3,4,5,6) %>%
-  adorn_totals("row")
 
-openxlsx::write.xlsx(as.data.frame(top_publishers_oac), 'Output/Tables/top_publishers_oac.xlsx')
-
-
-# Non-compliant by publisher
+# Non-compliant by publisher (current TAs)
 
 not_compliance_new_publisher <- merged_pvga %>%
   filter(compliance_new2 == "not compliant") %>%
@@ -563,9 +667,25 @@ articles_per_publisher <- merged_pvga %>%
   count(Publisher, sort = TRUE)
 
 not_compliance_new_publisher <- left_join(not_compliance_new_publisher, articles_per_publisher, by = "Publisher") %>%
-  mutate(percent_of_publisher_total = round(n.x / n.y * 100,1)) %>%
-  select(-5)
+  mutate(percent_of_publisher_total = round(n.x / n.y * 100,1))
 openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher), 'Output/Tables/not_compliant_new_publisher.xlsx')
+
+
+# # Non-compliant by publisher (JISC TAs in place)
+not_compliance_new_publisher_target_TAs <- merged_pvga %>%
+  filter(compliance_new_target_TAs == "No supported route") %>%
+  count(Publisher, sort = TRUE) %>%
+  mutate(percent = (n / sum(n)) * 100) %>%
+  mutate(cml = cumsum(percent))
+
+  # add in total articles per publisher
+articles_per_publisher <- merged_pvga %>%
+  count(Publisher, sort = TRUE)
+
+not_compliance_new_publisher_target_TAs <- left_join(not_compliance_new_publisher_target_TAs, articles_per_publisher, by = "Publisher") %>%
+  mutate(percent_of_publisher_total = round(n.x / n.y * 100,1))
+
+openxlsx::write.xlsx(as.data.frame(not_compliance_new_publisher_target_TAs), 'Output/Tables/not_compliant_new_publisher_target_TAs.xlsx')
 
 # Publisher by discipline
 disciplines <- merged_pvga %>% 
@@ -579,7 +699,8 @@ publisher_discipline <- disciplines %>%
   arrange(desc(n)) %>%
   arrange(disc) %>%
   mutate(percent = round(n/sum(n)*100,1), cml = cumsum(percent)) %>%
-  filter(cml < 80)
+  adorn_totals("row")
+  filter(cml <= 80)
 
 openxlsx::write.xlsx(as.data.frame(publisher_discipline), 'Output/Tables/publisher_discipline.xlsx')
 
@@ -605,8 +726,7 @@ missing_publisher_info <- bind_rows(merged_pvga %>% filter(grepl("Arts", discipl
 
 # Simple breakdown of green compliance
 simple_green <- merged_pvga %>% 
-  filter(journal_type != "Pure Gold") %>%
-  group_by(g_license_cc_by, g_embargo3) %>% 
+  group_by(g_license_cc_by, g_embargo_zero) %>% 
   count() %>%
   ungroup() %>%
   mutate(percent = round(n / sum(n) * 100,1))

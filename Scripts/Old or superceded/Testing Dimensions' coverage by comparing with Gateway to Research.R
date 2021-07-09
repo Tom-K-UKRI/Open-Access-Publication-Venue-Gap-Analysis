@@ -16,53 +16,123 @@ rm(list=ls())
 
 library(tidyverse)
 library(openxlsx)
+library(readr)
+library(janitor)
 
 
 #XXXXXXXXX
 # Import data----
-gtr18 <- read.xlsx("Data/Raw data/gtr_ukri_2018.xlsx")
-dim18 <- read.xlsx("Data/Raw data/dim_ukri_2018.xlsx") # when updating be careful to include all UKRI Dimensions (NOT UK filtered)
+gtr <- read_csv("Data/Raw data/gtr_2016_2020.csv")
+dim18 <- read_tsv("Data/Raw data/20210401 Dimensions export pubs UKRI funded 2014-2020.tsv") %>%
+  filter(PubYear == 2018) %>%
+  clean_names()
+
+load("Data/Raw data/TEMP_oa_block_grant_articles.Rda")
 
 # Format data----
 
-  # Remove unncecessary columns
-gtr18 <- subset(gtr18, select = -c(PublicationType, Volume, Issue, Pages, PMID, GtRPublicationURL, GtR.OutcomeId, ProjectId, FundingOrgID, LeadROID))
-
-dim18 <- subset(dim18, select = -c(date, dimensions_url, funder_countries, journal_id, journal_lists, linkout, research_org_countries, research_org_country_names, supporting_grant_ids, type, year))
-
   # Remove duplicates
-# gtr182 <- gtr18[!duplicated(gtr18$Title), ] # this removes almost half the records (from 79306 to 40566)
-gtr18 <- gtr18[!duplicated(gtr18$DOI), ] # this removes over half the records (from 79306 to 36169 - this captures all of the ones removed due to title match also so no need to do that)
-dim18 <- dim18[!duplicated(dim18$doi), ]
+gtr <- gtr %>% distinct(DOI, .keep_all = TRUE) %>% select(DOI, Title, Year, JournalName)
+dim18 <- dim18 %>% distinct(DOI, .keep_all = TRUE) %>% select(doi, title, source_title, pub_year, open_access)
+oabg <- oa_block_grant_articles %>% distinct(doi, .keep_all = TRUE) %>% select(doi, title, year)
 
   # Reformat merging variables
-gtr18$DOI <- tolower(gtr18$DOI)
-dim18$doi <- tolower(dim18$doi)
-
-gtr18$Title <- tolower(gtr18$Title)
+gtr$Title <- tolower(gtr$Title)
 dim18$title <- tolower(dim18$title)
+oabg$title <- tolower(oabg$title)
+
+oabg_18 <- oabg %>% filter(year == 2018)
 
   # New variable for number of articles per journal
-articles_per_journal = gtr18 %>% group_by(JournalName) %>% count()
-gtr18 <- left_join(gtr18, articles_per_journal, by = "JournalName") %>%
+articles_per_journal = gtr %>% group_by(JournalName) %>% count()
+gtr <- left_join(gtr, articles_per_journal, by = "JournalName") %>%
   rename(articles_in_journal = n)
 
 # Merge data----
 
     # Series of inner joins to find all possible matches
-gtr_test1 <- inner_join(gtr18, dim18, by = c("DOI" = "doi"))
-gtr_test2 <- inner_join(gtr18, dim18, by = c("Title" = "title"))
+gtr_test1 <- inner_join(gtr, dim18, by = c("DOI" = "doi"))
+gtr_test2 <- inner_join(gtr, dim18, by = c("Title" = "title"))
+
+gtr_test_bg_1 <- inner_join(gtr, oabg_18, by = c("DOI" = "doi"))
+gtr_test_bg_2 <- inner_join(gtr, oabg_18, by = c("Title" = "title"))
 
 
 # Bind rows to bring together all matching rows, then keep only first match for each article
 gtr_test3 <- bind_rows(gtr_test1, gtr_test2) %>%
-  filter(!duplicated(DOI)) # This has 32431 rows, meaning we were able to find a match in Dimensions for 89% of the articles in GtR
+  filter(!duplicated(DOI)) # This has 33529 rows, meaning we were able to find a match in GtR for 70% of articles in Dimensions
+
+gtr_test_bg_3 <- bind_rows(gtr_test_bg_1, gtr_test_bg_2) %>%
+  filter(!duplicated(DOI)) # This has 9826 rows meaning we were able to find a match for 68% of block grant returns in Dimensions
 
 # Identify rows with no match
-gtr_test0 <- anti_join(gtr18, gtr_test3, by = "DOI")
+gtr_test0 <- anti_join(gtr, gtr_test3, by = "DOI")
 
 # Merge these non-matched rows with the matched rows
 gtr_test <- bind_rows(gtr_test0, gtr_test3) # this has 35945 
+
+
+# merge block grant and gateway to research and compare this to Dimensions
+oabg_gtr <- oa_block_grant_articles %>%
+  distinct(doi, .keep_all = TRUE) %>% select(doi, title) %>% rename(DOI = doi, Title = title) %>%
+  bind_rows(gtr %>% distinct(DOI, .keep_all = TRUE) %>% select(DOI, Title)) %>%
+  distinct(DOI, .keep_all = TRUE) %>%
+  distinct(Title, .keep_all = TRUE)
+  
+# Series of inner joins to find all possible matches
+gtr_bg_dim_test1 <- inner_join(oabg_gtr, dim18, by = c("DOI" = "doi"))
+gtr_bg_dim_test2 <- inner_join(oabg_gtr, dim18, by = c("Title" = "title"))
+
+# Bind rows to bring together all matching rows, then keep only first match for each article
+gtr_bg_dim_test3 <- bind_rows(gtr_bg_dim_test1, gtr_bg_dim_test2) %>%
+  filter(!duplicated(DOI)) # This has 33529 rows meaning a match with 77% of Dimensions
+
+gtr_bg_dim_test0 <- anti_join(oabg_gtr, gtr_bg_dim_test3, by = "DOI")
+
+
+
+# Testing dimensions
+# Import data----
+gtr <- read_csv("Data/Raw data/gtr_2016_2020.csv")
+dim <- read_tsv("Data/Raw data/20210401 Dimensions export pubs UKRI funded 2014-2020.tsv") %>%
+  clean_names()
+load("Data/Raw data/TEMP_oa_block_grant_articles.Rda")
+
+dim_clean <- dim %>% distinct(doi, .keep_all = TRUE) %>% distinct(title, .keep_all = TRUE)
+gtr_18 <- gtr %>% filter(Year == 2018) %>% distinct(DOI, .keep_all = TRUE) %>% distinct(Title, .keep_all = TRUE)
+oabg_18 <- oa_block_grant_articles %>% filter(year == 2018) %>% distinct(doi, .keep_all = TRUE) %>% distinct(title, .keep_all = TRUE)
+
+dim_gtr_test1 <- inner_join(dim, gtr_18, by = c("doi" = "DOI"))
+dim_gtr_test2 <- inner_join(dim, gtr_18, by = c("title" = "Title"))
+
+# Bind rows to bring together all matching rows, then keep only first match for each article
+dim_gtr_test3 <- bind_rows(dim_gtr_test1, dim_gtr_test2) %>%
+  filter(!duplicated(doi)) # This has 33565 rows, meaning we were able to find 88% of 2018 GtR articles in Dimensions 2018
+
+dim_bg_test1 <- inner_join(dim, oabg_18, by = c("doi" = "doi"))
+dim_bg_test2 <- inner_join(dim, oabg_18, by = c("title" = "title"))
+
+# Bind rows to bring together all matching rows, then keep only first match for each article
+dim_bg_test3 <- bind_rows(dim_bg_test1, dim_bg_test2) %>%
+  filter(!duplicated(doi)) # This has 13085 rows meaning we can find 91% of 2018 BG articles in Dimension
+
+
+
+# EXploring articles with no match in Dimensions----
+
+dim_gtr_test1 <- inner_join(dim, gtr_18, by = c("doi" = "DOI"))
+dim_gtr_test2 <- inner_join(dim, gtr_18, by = c("title" = "Title"))
+
+# Bind rows to bring together all matching rows, then keep only first match for each article
+dim_gtr_test3 <- bind_rows(dim_gtr_test1, dim_gtr_test2) %>%
+  filter(!duplicated(doi)) # This has 33565 rows, meaning we were able to find 88% of 2018 GtR articles in Dimensions 2018
+
+in_gtr_missing_from_dimensions <- anti_join(gtr_18, dim_gtr_test3, by = c("DOI" = "doi"))
+
+
+
+
+
 
 
 # Characteristics of GtR articles with no match in Dimensions----
