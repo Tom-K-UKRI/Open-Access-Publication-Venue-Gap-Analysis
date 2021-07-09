@@ -76,9 +76,6 @@ unpaywall_green_plus_gold_licences <- unpaywall %>%
   left_join(unpaywall_green %>% select(doi, upw_green_licence, upw_green_version), by = "doi") %>%
   left_join(unpaywall_gold %>% select(doi, upw_gold_licence), by = "doi")
 
-unpaywall_green_plus_gold_licences$upw_green_licence[unpaywall_green_plus_gold_licences$upw_green_licence == ""] <- "No green licence found"
-
-
 # 117,583/163,009 (72%) have a green AAM or VoR
 
 save(unpaywall_green_plus_gold_licences, file = "Data/unpaywall_green_plus_gold_licences.RData")
