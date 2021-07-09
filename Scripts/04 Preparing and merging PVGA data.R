@@ -336,7 +336,7 @@ merged_pvga <- subset(merged_pvga,
                                   g_conditions, g_location.location, g_embargo.amount, fee_license, fee_copyright_owner, fee_conditions))
 
 #XXXXXXXXXXXXX
-#7. CREATE COMPLIANCE VARIABLES TO INDICATE COMPLIANCE WITH DIFFERENT POLICY SCENARIOS----
+#9. CREATE COMPLIANCE VARIABLES TO INDICATE COMPLIANCE WITH DIFFERENT POLICY SCENARIOS----
 
   # NB. NOTE FOR METHODOLOGY: Since we don't have Sherpa matches for all the articles, around 2.5% do not have data on license or embargo. 30% of these are recorded as Pure Gold OA in Dimensions and 25% as Hybrid  Gold, so we assume these have a cc_by license for purposes of estimating compliance (given this is true for the vast majority of these journals where we do have data). In practice, we do this by introducing 'NA' higher in the heirarchy than "not cc_by" in the compliance tables below. While some of the remaining 45% are recorded as Green by Dimensions, we can not reasonably record these as being green for potential compliance purposes because we have no data on the license or embargos. 
 
